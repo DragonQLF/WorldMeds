@@ -1,26 +1,16 @@
-# Dockerfile for the backend
-FROM node:20.5.0
+FROM node:20.5.0 as build
 
-# Create the application directory
 WORKDIR /usr/src/app
 
-# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the application code
 COPY . .
+RUN npm run build
 
-# Expose the port (adjust as necessary)
-EXPOSE 3000
-
-# Add a health check to ensure the server is running
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
-
-# Run the application as a non-root user
-RUN useradd -m appuser
-USER appuser
-
-# Start the application
-CMD ["npm", "start"]
+# Custom nginx configuration for client-side routing
+FROM nginx:alpine
+COPY --from=build /usr/src/app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
