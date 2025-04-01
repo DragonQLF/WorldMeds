@@ -1,26 +1,23 @@
-# Dockerfile for the backend
 FROM node:20.5.0
 
-# Create the application directory
 WORKDIR /usr/src/app
 
-# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the application code
 COPY . .
 
-# Expose the port (adjust as necessary)
-EXPOSE 3000
+# Ensure the backend listens on all network interfaces
+ENV HOST=0.0.0.0
 
-# Add a health check to ensure the server is running
+EXPOSE 3001
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+  CMD curl -f http://localhost:3001/health || exit 1
 
-# Run the application as a non-root user
-RUN useradd -m appuser
+# Fix file permissions before switching user
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /usr/src/app
 USER appuser
 
-# Start the application
 CMD ["npm", "start"]
