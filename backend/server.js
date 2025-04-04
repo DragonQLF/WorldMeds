@@ -1,20 +1,10 @@
 const express = require("express");
-const mysql = require("mysql2");
+const db = require("./db");
 
 const app = express();
 const port = 3001;
 
-const db = mysql.createConnection({
-    host: "db",
-    user: "worldmeds_user",
-    password: "1234",
-    database: "worldmeds_db"
-});
-
-db.connect(err => {
-    if (err) throw err;
-    console.log("Connected to MySQL!");
-});
+// Removed the duplicate database connection code
 
 // ✅ Get all medicines for a country
 app.get("/api/country/:countryId/medicines", (req, res) => {
