@@ -4,8 +4,6 @@ const db = require("./db");
 const app = express();
 const port = 3001;
 
-// Removed the duplicate database connection code
-
 // ✅ Get all medicines for a country
 app.get("/api/country/:countryId/medicines", (req, res) => {
     const sql = `
@@ -24,13 +22,31 @@ app.get("/api/country/:countryId/medicines", (req, res) => {
     });
 });
 
+// ✅ New endpoint to get summary for a country
+app.get("/api/country/:countryId/summary", (req, res) => {
+    const sql = `
+        SELECT p.nome as country, 
+               AVG(mp.preco_venda) as average_sale_price,
+               SUM(mp.quantidade_comprada) as total_quantity
+        FROM medicamentos_paises mp
+        JOIN paises p ON mp.pais_id = p.id
+        WHERE p.id = ?
+        GROUP BY p.nome;
+    `;
+
+    db.query(sql, [req.params.countryId], (err, result) => {
+        if (err) throw err;
+        res.json(result[0]);
+    });
+});
+
 // ✅ Get a specific medicine across multiple countries
 app.get("/api/medicine/:medicineId/countries", (req, res) => {
     const sql = `
         SELECT m.nome as medicine, m.dosagem as dosage, 
                p.nome as country, p.moeda as currency, 
                mp.quantidade_comprada as quantity_purchased, 
-               mp.preco_referencia as reference_price
+               mp.preco_venda as sale_price
         FROM medicamentos_paises mp
         JOIN paises p ON mp.pais_id = p.id
         JOIN medicamentos m ON mp.medicamento_id = m.id

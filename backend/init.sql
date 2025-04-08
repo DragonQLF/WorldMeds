@@ -1,4 +1,4 @@
-const db = require("./db");
+
 CREATE TABLE IF NOT EXISTS paises (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
