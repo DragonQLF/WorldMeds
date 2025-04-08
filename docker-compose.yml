@@ -1,4 +1,3 @@
-
 services:
   db:
     image: mysql:8.0
@@ -17,7 +16,7 @@ services:
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
 
     healthcheck:  # Adicione um healthcheck para o MySQL
-      test: mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
