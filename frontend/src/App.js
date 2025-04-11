@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import styled from "styled-components";
 import WorldMap from "./screens/WorldMap";
 import CountryPage from "./components/countrypage";
-import Sidebar from "./components/Sidebar"; // Import Sidebar
+import Sidebar from "./components/Sidebar/Sidebar"; // Import Sidebar
 
 const AppContainer = styled.div`
   display: flex;
@@ -19,9 +19,9 @@ const MainContent = styled.main`
 
 function App() {
   const [activePage, setActivePage] = useState("home");
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState(null);
 
-  const handleCountryClick = (countryName: string) => {
+  const handleCountryClick = (countryName) => {
     setSelectedCountry(countryName);
   };
 
