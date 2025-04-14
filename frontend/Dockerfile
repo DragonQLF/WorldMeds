@@ -1,27 +1,32 @@
-# Stage 1: Build
-FROM node:23-alpine AS build
+# Use Node 20 Alpine as base image
+FROM node:23-alpine AS builder
+
+# Set working directory
 WORKDIR /app
 
-# Copy dependency definitions
-COPY package.json package-lock.json* ./
+# Copy package files
+COPY package*.json ./
 
-# Install all dependencies (ensure react-scripts is included)
-RUN npm install
+# Install dependencies
+RUN npm ci
 
-# Copy the rest of your application’s source code
+# Copy all files
 COPY . .
 
-# Build the app for production
+# Build the application
 RUN npm run build
 
-# Stage 2: Serve
-FROM nginx:alpine
+# Production stage
+FROM nginx:alpine AS production
 
-# Copy built assets from the build stage to Nginx's public folder
-COPY --from=build /app/build /usr/share/nginx/html
+# Copy built assets from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose port 80 for the container
+# Copy custom nginx config if needed
+# COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port
 EXPOSE 80
 
-# Start Nginx when the container is launched
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]

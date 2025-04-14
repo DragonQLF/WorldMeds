@@ -8,14 +8,12 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-
     ports:
       - "3306:3306"
     volumes:
       - worldmeds_db_data:/var/lib/mysql
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-
-    healthcheck:  # Adicione um healthcheck para o MySQL
+    healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
       interval: 5s
       timeout: 5s
@@ -35,15 +33,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   frontend:
     build: ./frontend
     container_name: worldmeds-frontend
     restart: always
     ports:
-      - "3002:80"
-    depends_on:
-      - backend
+      - "8080:80"
 
 volumes:
   worldmeds_db_data:
