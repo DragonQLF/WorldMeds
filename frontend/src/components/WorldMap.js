@@ -68,7 +68,7 @@ const WorldMap = ({ onCountryClick }) => {
 
   const colorScale = scaleLinear()
   .domain([0, 50, 100,150])
-  .range(['#e6f3ff', '#ffd966', '#e69138','cc0000']);
+  .range(['#e6f3ff', '#ffd966', '#e69138','#cc0000']);
 
   const handleMouseEnter = (event, geo) => {
     const countryName = geo.properties.NAME || geo.properties.name;

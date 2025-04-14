@@ -1,4 +1,4 @@
-FROM node:20.5.0 as build
+FROM node:20.5.0 AS build
 
 WORKDIR /usr/src/app
 
@@ -8,7 +8,7 @@ RUN npm install --force
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:1.25-alpine
 COPY --from=build /usr/src/app/build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

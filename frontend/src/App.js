@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import WorldMap from './components/WorldMap';
 import CountryPage from './components/countrypage';
+import AuthModal from './components/AuthModal'; // novo componente
 
 const AppContainer = styled.div`
   display: flex;
@@ -85,6 +86,7 @@ const IconButton = styled.button`
 function App() {
   const [activePage, setActivePage] = useState('home');
   const [selectedCountry, setSelectedCountry] = useState(null);
+  const [authPage, setAuthPage] = useState(null); // login/signup/forgot
 
   const handleCountryClick = (countryName) => {
     setSelectedCountry(countryName);
@@ -120,9 +122,9 @@ function App() {
         </div>
 
         <div>
-          <NavButton>
+          <NavButton onClick={() => setAuthPage('login')}>
             <span>🚪</span>
-            Logout
+            Login
           </NavButton>
         </div>
       </Sidebar>
@@ -139,10 +141,26 @@ function App() {
           </IconButton>
         </ControlBar>
 
-        <WorldMap onCountryClick={handleCountryClick} />
+        {activePage === 'home' && (
+          <>
+            <WorldMap onCountryClick={handleCountryClick} />
+            {selectedCountry && (
+              <CountryPage countryName={selectedCountry} onClose={handleCloseCountryPage} />
+            )}
+          </>
+        )}
 
-        {selectedCountry && (
-          <CountryPage countryName={selectedCountry} onClose={handleCloseCountryPage} />
+        {/* Auth Modal */}
+        {authPage && (
+          <AuthModal
+            activePage={authPage}
+            setActivePage={setAuthPage}
+            onClose={() => setAuthPage(null)}
+            onLoginSuccess={() => {
+              setAuthPage(null);
+              setActivePage('home');
+            }}
+          />
         )}
       </MainContent>
     </AppContainer>
