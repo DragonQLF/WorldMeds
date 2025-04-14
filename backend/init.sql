@@ -22,6 +22,14 @@ CREATE TABLE IF NOT EXISTS medicamentos_paises (
     FOREIGN KEY (medicamento_id) REFERENCES medicamentos(id),
     FOREIGN KEY (pais_id) REFERENCES paises(id)
 );
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  email VARCHAR(100) UNIQUE,
+  password VARCHAR(255)
+);
+
 
 -- Insert example data
 INSERT INTO paises (nome, moeda) VALUES ('Argentina', 'ARS'), ('Brazil', 'BRL');
