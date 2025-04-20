@@ -237,6 +237,22 @@ app.get("/api/countries-average-prices", (req, res) => {
       res.json(results);
     });
   });
+
+  app.get("/api/country/:countryId/total-medicines", (req, res) => {
+    const sql = `
+      SELECT SUM(mp.quantidade_comprada) AS total_medicines
+      FROM medicamentos_paises mp
+      WHERE mp.pais_id = ?;
+    `;
+    db.query(sql, [req.params.countryId], (err, results) => {
+      if (err) {
+        console.error("Error fetching total medicines:", err);
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json(results[0]);
+    });
+  });
+  
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
