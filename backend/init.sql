@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
   first_name VARCHAR(100),
   last_name VARCHAR(100),
   email VARCHAR(100) UNIQUE,
-  password VARCHAR(255)
+  password VARCHAR(255),
+  profile_picture VARCHAR(255) NULL
 );
 
 -- Insert example data

@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +9,7 @@ import { Eye, EyeOff, Key, Mail } from "lucide-react";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMapContext } from "@/contexts/MapContext";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -21,6 +21,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false);
   const { login, isLoading } = useAuth();
+  const { darkMode } = useMapContext();
   const navigate = useNavigate();
   
   const form = useForm<LoginFormData>({
@@ -38,15 +39,17 @@ export default function LoginPage() {
     }
   };
 
+  const logoSrc = darkMode ? "/icone-dark.png" : "/icone.png";
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-md space-y-8 p-4">
         <Card className="border-none shadow-lg">
           <CardHeader className="space-y-1">
             <div className="flex justify-center mb-2">
-              <img src="/icone.png" alt="Logo" className="h-16 w-auto" />
+              <img src={logoSrc} alt="WorldMeds" className="h-16 w-auto" />
             </div>
-            <CardTitle className="text-2xl text-center font-bold">Welcome back</CardTitle>
+            <CardTitle className="text-2xl text-center font-bold worldmeds-font">WorldMeds</CardTitle>
             <CardDescription className="text-center">
               Enter your credentials to access your account
             </CardDescription>
@@ -67,6 +70,7 @@ export default function LoginPage() {
                             type="email" 
                             placeholder="name@example.com" 
                             className="pl-10" 
+                            autoComplete="username" 
                             {...field} 
                           />
                         </div>
@@ -89,6 +93,7 @@ export default function LoginPage() {
                             type={showPassword ? "text" : "password"}
                             placeholder="••••••••"
                             className="pl-10"
+                            autoComplete="current-password"
                             {...field}
                           />
                           <button

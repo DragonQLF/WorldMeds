@@ -9,6 +9,7 @@ export const Sidebar: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -21,8 +22,16 @@ export const Sidebar: React.FC = () => {
     // Add event listener
     window.addEventListener('resize', checkIfMobile);
     
+    // Add animation init
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+    }, 100);
+    
     // Cleanup
-    return () => window.removeEventListener('resize', checkIfMobile);
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleMouseEnter = () => {
@@ -46,10 +55,10 @@ export const Sidebar: React.FC = () => {
     return (
       <>
         {!isMobileMenuOpen && (
-          <div className="fixed top-4 left-4 z-50">
+          <div className={`fixed top-4 left-4 z-50 transition-opacity duration-300 ease-in-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
             <button 
               onClick={toggleMobileMenu} 
-              className="p-2 rounded-md hover:bg-gray-100"
+              className="p-2 rounded-md hover:bg-gray-100 transition-all duration-200 hover:shadow-md active:scale-95"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -63,9 +72,9 @@ export const Sidebar: React.FC = () => {
   // For desktop: show sidebar
   return (
     <aside 
-      className={`flex h-screen flex-col justify-between items-start bg-white py-10 transition-all duration-300 ease-in-out ${
+      className={`flex h-screen flex-col justify-between items-start bg-background dark:bg-sidebar py-10 transition-all duration-300 ease-in-out shadow-lg ${
         isExpanded ? "w-[220px] px-5" : "w-[93px] px-6"
-      }`}
+      } ${isLoaded ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

@@ -1,13 +1,26 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { auth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
+import { api } from "@/lib/api";
 
 interface User {
   id: string;
   email: string;
   firstName?: string;
   lastName?: string;
+  profilePicture?: string;
+}
+
+interface ProfileUpdateData {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  profilePicture?: string | File;
+}
+
+interface PasswordChangeData {
+  currentPassword: string;
+  newPassword: string;
 }
 
 interface AuthContextType {
@@ -17,6 +30,9 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (data: RegisterData) => Promise<boolean>;
+  updateProfile: (data: ProfileUpdateData) => Promise<boolean>;
+  changePassword: (data: PasswordChangeData) => Promise<boolean>;
+  uploadProfilePicture: (file: File) => Promise<string | null>;
 }
 
 interface RegisterData {
@@ -45,8 +61,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const checkAuth = async () => {
       try {
         const storedUser = auth.getUser();
-        if (storedUser) {
-          setUser(storedUser);
+        const token = localStorage.getItem("auth_token");
+        
+        if (storedUser && token) {
+          // Verify token is still valid with the backend
+          try {
+            // Make a request to get the profile to verify the token
+            await api.get("/profile");
+            // If successful, set the user
+            setUser(storedUser);
+          } catch (error) {
+            // If the token is invalid, clear auth data
+            console.error("Invalid token, clearing auth data");
+            auth.logout();
+          }
         }
       } catch (error) {
         console.error("Auth check error:", error);
@@ -124,6 +152,108 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateProfile = async (data: ProfileUpdateData): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      const response = await auth.updateProfile(data);
+      
+      if (response.success) {
+        // Update local user state with new information
+        setUser(prevUser => prevUser ? { ...prevUser, ...response.user } : null);
+        
+        toast({
+          title: "Profile updated",
+          description: "Your profile information has been updated successfully",
+        });
+        return true;
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Update failed",
+          description: response.message || "Could not update profile",
+        });
+        return false;
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Update error",
+        description: "An unexpected error occurred",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const changePassword = async (data: PasswordChangeData): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      const response = await auth.changePassword(data);
+      
+      if (response.success) {
+        toast({
+          title: "Password updated",
+          description: "Your password has been changed successfully",
+        });
+        return true;
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Update failed",
+          description: response.message || "Could not update password",
+        });
+        return false;
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Update error",
+        description: "An unexpected error occurred",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const uploadProfilePicture = async (file: File): Promise<string | null> => {
+    try {
+      setIsLoading(true);
+      const response = await auth.uploadProfilePicture(file);
+      
+      if (response.success) {
+        // Update local user state with new profile picture
+        setUser(prevUser => prevUser ? { 
+          ...prevUser, 
+          profilePicture: response.profilePicture 
+        } : null);
+        
+        toast({
+          title: "Photo uploaded",
+          description: "Your profile photo has been updated",
+        });
+        return response.profilePicture;
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: response.message || "Could not upload profile picture",
+        });
+        return null;
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Upload error",
+        description: "An unexpected error occurred",
+      });
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     auth.logout();
     setUser(null);
@@ -142,6 +272,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         register,
+        updateProfile,
+        changePassword,
+        uploadProfilePicture,
       }}
     >
       {children}
