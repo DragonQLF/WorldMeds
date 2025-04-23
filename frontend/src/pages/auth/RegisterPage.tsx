@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +9,7 @@ import { Eye, EyeOff, Key, Mail, User } from "lucide-react";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMapContext } from "@/contexts/MapContext";
 
 const registerSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -28,6 +28,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const { register, isLoading } = useAuth();
+  const { darkMode } = useMapContext();
   const navigate = useNavigate();
 
   const form = useForm<RegisterFormData>({
@@ -54,15 +55,17 @@ export default function RegisterPage() {
     }
   };
 
+  const logoSrc = darkMode ? "/icone-dark.png" : "/icone.png";
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-md space-y-8 p-4">
         <Card className="border-none shadow-lg">
           <CardHeader className="space-y-1">
             <div className="flex justify-center mb-2">
-              <img src="/icone.png" alt="Logo" className="h-16 w-auto" />
+              <img src={logoSrc} alt="WorldMeds" className="h-16 w-auto" />
             </div>
-            <CardTitle className="text-2xl text-center font-bold">Create an account</CardTitle>
+            <CardTitle className="text-2xl text-center font-bold worldmeds-font">WorldMeds</CardTitle>
             <CardDescription className="text-center">
               Enter your information to get started
             </CardDescription>
@@ -116,6 +119,7 @@ export default function RegisterPage() {
                             type="email" 
                             placeholder="name@example.com"
                             className="pl-10" 
+                            autoComplete="username"
                             {...field} 
                           />
                         </div>
@@ -138,6 +142,7 @@ export default function RegisterPage() {
                             type={showPassword ? "text" : "password"}
                             placeholder="••••••••"
                             className="pl-10"
+                            autoComplete="new-password"
                             {...field}
                           />
                           <button
@@ -167,6 +172,7 @@ export default function RegisterPage() {
                             type={showConfirmPassword ? "text" : "password"}
                             placeholder="••••••••"
                             className="pl-10"
+                            autoComplete="new-password"
                             {...field}
                           />
                           <button

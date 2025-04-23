@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import InteractiveMap from "@/components/map/InteractiveMap";
@@ -9,8 +8,10 @@ const Index = () => {
   const [selectedCountryId, setSelectedCountryId] = useState<string | null>(null);
   const { darkMode } = useMapContext();
 
+  // Debounce country clicks to prevent duplicate logging
   const handleCountryClick = (countryName: string) => {
-    console.log(`Country clicked: ${countryName}`);
+    // We don't need to log country clicks here anymore
+    // The InteractiveMap component already handles everything
   };
 
   const handleCountrySelect = (country: any) => {

@@ -1,7 +1,6 @@
-
 import React from "react";
-import { useLocation } from "react-router-dom";
-import { LayoutGrid, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useSidebar } from "@/hooks/useSidebar";
 
 interface SidebarNavProps {
   isExpanded: boolean;
@@ -9,40 +8,35 @@ interface SidebarNavProps {
 }
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({ isExpanded, toggleMobileMenu }) => {
-  const location = useLocation();
-  const currentPath = location.pathname;
+  const { navigationItems, activeItem } = useSidebar();
+  const navigate = useNavigate();
 
-  const navItems = [
-    {
-      name: "Dashboard",
-      icon: <LayoutGrid className="w-6 h-6" />,
-      path: "/",
-    },
-    {
-      name: "Settings",
-      icon: <Settings className="w-6 h-6" />,
-      path: "/settings",
-    },
-  ];
+  const handleNavigation = (href: string) => {
+    navigate(href);
+    if (toggleMobileMenu) {
+      toggleMobileMenu();
+    }
+  };
 
   return (
-    <nav className="flex h-[550px] flex-col items-start gap-4 self-stretch w-full">
-      <div className="w-full mt-16 space-y-4">
-        {navItems.map((item) => {
-          const isActive = currentPath === item.path;
+    <nav className="flex flex-col items-start gap-4 self-stretch w-full py-10">
+      <div className="w-full space-y-2">
+        {navigationItems.map((item, index) => {
+          const isActive = activeItem === item.href;
           return (
             <button
-              key={item.name}
+              key={index}
+              onClick={() => handleNavigation(item.href)}
               className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg w-full transition-all duration-200 ${
                 isActive
-                  ? "bg-blue-500 text-white"
-                  : "hover:bg-gray-100 text-gray-500"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-gray-500 dark:text-gray-300"
               }`}
             >
-              {item.icon}
+              <item.icon className={`w-5 h-5 ${isActive ? "text-primary-foreground" : ""}`} />
               {isExpanded && (
                 <span className={`transition-opacity duration-200 ${isActive ? "font-medium" : ""}`}>
-                  {item.name}
+                  {item.label}
                 </span>
               )}
             </button>

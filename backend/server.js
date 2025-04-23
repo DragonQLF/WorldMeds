@@ -1,9 +1,17 @@
 const express = require("express");
 const db = require("./db");
 const cors = require("cors");
+const path = require('path');
+const fs = require('fs');
+const mkdirp = require('mkdirp');
 
 const app = express();
 const port = 3001;
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'public', 'uploads', 'profile-pictures');
+mkdirp.sync(uploadsDir);
+console.log(`Uploads directory ready: ${uploadsDir}`);
 
 // Updated CORS configuration
 app.use(cors({
@@ -14,6 +22,22 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Import the config
+const config = require('./config');
+
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+
+// Use auth routes
+app.use('/api', authRoutes);
+
+// Use user routes
+app.use('/api', userRoutes);
+
+// Serve static files from the public directory
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // ✅ Get all countries
 app.get("/api/countries", (req, res) => {
@@ -683,6 +707,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+// Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

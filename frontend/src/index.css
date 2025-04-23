@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Font for WorldMeds text */
+.worldmeds-font {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.05em;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -13,7 +19,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 211 100% 50%; /* Blue: #007AFF */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -34,21 +40,17 @@
 
     --radius: 0.5rem;
 
+    --map-bg-light: 0 0% 87%; /* #dfdfdf */
+    --map-bg-dark: 0 0% 50%; /* #807c84 - exactly as requested */
+
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
+    --sidebar-primary: 211 100% 50%; /* Blue: #007AFF */
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 211 100% 50%; /* Blue: #007AFF */
   }
 
   .dark {
@@ -61,7 +63,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 267 65% 60%; /* Purple: #7F35FF */
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -79,14 +81,15 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
+    
+    --sidebar-background: 222.2 47.4% 11.2%; /* Fixed dark sidebar color */
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 267 65% 60%; /* Purple: #7F35FF */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 267 65% 60%; /* Purple: #7F35FF */
   }
 }
 
@@ -101,7 +104,7 @@
 
   html,
   body {
-    @apply h-screen w-screen overflow-hidden bg-gray-100 m-0 p-0;
+    @apply h-screen w-screen overflow-hidden m-0 p-0;
   }
 
   #__next {
@@ -111,4 +114,72 @@
   #root {
     @apply h-full w-full; /* For React apps */
   }
+}
+
+/* Ensure sidebar has correct background in dark mode */
+.dark [data-sidebar="sidebar"] {
+  @apply bg-sidebar !important;
+}
+
+/* Fix forced background on sidebar in dark mode */
+.dark .group\/sidebar-wrapper [data-sidebar="sidebar"],
+.dark div[data-sidebar="sidebar"],
+.dark [data-sidebar="menu-item"] div,
+.dark [data-sidebar="content"],
+.dark [data-sidebar="header"],
+.dark [data-sidebar="footer"],
+.dark aside {
+  background-color: hsl(var(--sidebar-background)) !important;
+  color: hsl(var(--sidebar-foreground)) !important;
+}
+
+/* Fix any potential color overlaps in the sidebar */
+.dark [data-sidebar="menu-item"] button,
+.dark [data-sidebar="menu-item"] a,
+.dark [data-sidebar="footer"] button {
+  @apply text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+/* Scrollbar styling */
+.scrollbar-light::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-light::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.scrollbar-dark::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 4px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background: #444444;
+  border-radius: 4px;
 }

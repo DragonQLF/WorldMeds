@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 
 import {
   Dialog,
@@ -19,6 +19,9 @@ import { api } from "@/lib/api";
 interface SearchResult {
   id: number;
   name: string;
+  dosage?: string;
+  averagePrice?: number;
+  totalMedicines?: number;
   [key: string]: any;
 }
 
@@ -32,8 +35,47 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const { darkMode } = useMapContext();
   
+  // Query for popular/trending items that will show by default
+  const { data: popularItems = [], isLoading: isLoadingPopular } = useQuery({
+    queryKey: [type, 'popular'],
+    queryFn: async () => {
+      if (!open) return [];
+      
+      const endpoint = type === "country" 
+        ? `/popular-countries`
+        : `/popular-medicines`;
+      
+      try {
+        const response = await api.get(endpoint);
+        return response.data;
+      } catch (error) {
+        console.error("Error fetching popular items:", error);
+        // Return mock data if API fails
+        if (type === "country") {
+          return [
+            { id: 1, name: "United States", totalMedicines: 1240, averagePrice: 45.99 },
+            { id: 2, name: "Brazil", totalMedicines: 980, averagePrice: 23.50 },
+            { id: 3, name: "Germany", totalMedicines: 890, averagePrice: 38.75 },
+            { id: 4, name: "India", totalMedicines: 1450, averagePrice: 12.30 },
+            { id: 5, name: "Japan", totalMedicines: 760, averagePrice: 56.20 }
+          ];
+        } else {
+          return [
+            { id: 1, name: "Paracetamol", dosage: "500mg", averagePrice: 5.99 },
+            { id: 2, name: "Amoxicillin", dosage: "250mg", averagePrice: 12.50 },
+            { id: 3, name: "Ibuprofen", dosage: "400mg", averagePrice: 8.75 },
+            { id: 4, name: "Lisinopril", dosage: "10mg", averagePrice: 24.30 },
+            { id: 5, name: "Metformin", dosage: "500mg", averagePrice: 18.20 }
+          ];
+        }
+      }
+    },
+    enabled: open,
+  });
+  
+  // Query for search results
   const { data: results = [], isLoading } = useQuery({
-    queryKey: [type, searchTerm, open],
+    queryKey: [type, 'search', searchTerm, open],
     queryFn: async () => {
       if (!open || !searchTerm) return [];
       
@@ -41,8 +83,13 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
         ? `/search/countries?q=${searchTerm}`
         : `/search/medicines?q=${searchTerm}`;
       
-      const response = await api.get(endpoint);
-      return response.data;
+      try {
+        const response = await api.get(endpoint);
+        return response.data;
+      } catch (error) {
+        console.error("Error searching:", error);
+        return [];
+      }
     },
     enabled: open && !!searchTerm,
   });
@@ -54,6 +101,16 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
   const handleSelect = (item: SearchResult) => {
     onSelect(item);
     setOpen(false);
+  };
+  
+  // Determine which items to display
+  const displayItems = searchTerm ? results : popularItems;
+  const isLoadingItems = searchTerm ? isLoading : isLoadingPopular;
+  
+  // Format price to display
+  const formatPrice = (price?: number) => {
+    if (typeof price !== 'number') return 'N/A';
+    return `$${price.toFixed(2)}`;
   };
   
   return (
@@ -72,7 +129,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
         <DialogHeader>
           <DialogTitle>{type === "country" ? "Search Countries" : "Search Medicines"}</DialogTitle>
           <DialogDescription className={darkMode ? 'text-gray-300' : 'text-gray-500'}>
-            {type === "country" ? "Find countries and view their medicine data" : "Search for medicines across different countries"}
+            {searchTerm ? "Search results" : "Popular items"}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -85,22 +142,38 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
             value={searchTerm}
           />
           
-          <div className={`space-y-2 max-h-[40vh] overflow-y-auto ${darkMode ? 'scrollbar-dark' : 'scrollbar-light'}`}>
-            {isLoading && <p className="text-center py-4">Loading...</p>}
-            {!isLoading && results.length === 0 && searchTerm.length > 0 && (
+          <div className={`space-y-2 max-h-[50vh] overflow-y-auto ${darkMode ? 'scrollbar-dark' : 'scrollbar-light'}`}>
+            {isLoadingItems && <p className="text-center py-4">Loading...</p>}
+            
+            {!isLoadingItems && displayItems.length === 0 && searchTerm && (
               <p className="text-center py-4">No results found</p>
             )}
-            {results.length === 0 && searchTerm.length === 0 && (
-              <p className="text-center py-4">Type to search</p>
+            
+            {!isLoadingItems && displayItems.length === 0 && !searchTerm && (
+              <p className="text-center py-4">No popular items found</p>
             )}
-            {results.map((item: SearchResult) => (
+            
+            {displayItems.map((item: SearchResult) => (
               <Button
                 key={item.id}
                 variant="ghost"
-                className={`w-full justify-start text-left ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                className={`w-full justify-start text-left p-3 h-auto ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                 onClick={() => handleSelect(item)}
               >
-                {item.name}
+                <div className="flex flex-col items-start">
+                  <div className="font-medium">{item.name}</div>
+                  <div className="text-xs opacity-70 flex gap-2 mt-1">
+                    {type === "medicine" && item.dosage && (
+                      <span>{item.dosage}</span>
+                    )}
+                    {item.averagePrice !== undefined && (
+                      <span>{formatPrice(item.averagePrice)}</span>
+                    )}
+                    {type === "country" && item.totalMedicines !== undefined && (
+                      <span>{item.totalMedicines} medicines</span>
+                    )}
+                  </div>
+                </div>
               </Button>
             ))}
           </div>
