@@ -7,12 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { MapProvider } from "./contexts/MapContext";
 import Index from "./pages/Index";
 import Settings from "./pages/Settings";
-import LoginPage from "./pages/auth/LoginPage";
-import RegisterPage from "./pages/auth/RegisterPage";
-import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ProfilePage from "./pages/ProfilePage"; // Kept for future use if needed
 import { AuthProvider } from "./contexts/AuthContext";
-import GuestRoute from "./components/GuestRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Create a query client with proper configuration
@@ -33,11 +29,9 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider 
-      defaultTheme="light" 
+      defaultTheme="system" 
       storageKey="worldmeds-theme"
-      enableSystem={false}
-      attribute="class"
-      disableTransitionOnChange
+      enableSystem={true}
     >
       <AuthProvider>
         <MapProvider>
@@ -54,13 +48,6 @@ const App = () => (
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   {/* Add other protected routes here */}
-                </Route>
-                
-                {/* Guest-only routes - only for non-authenticated users */}
-                <Route element={<GuestRoute />}>
-                  <Route path="/auth/login" element={<LoginPage />} />
-                  <Route path="/auth/register" element={<RegisterPage />} />
-                  <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
                 </Route>
                 
                 <Route path="*" element={<Navigate to="/" />} />

@@ -1,26 +1,35 @@
 // Configuration settings for the application
 module.exports = {
   // Server configuration
-  PORT: process.env.PORT || 3001,
-  NODE_ENV: process.env.NODE_ENV || 'development',
+  PORT: 3001,
+  NODE_ENV: 'development',
   
   // JWT configuration
-  JWT_SECRET: process.env.JWT_SECRET || 'worldmeds-secret-key',
-  JWT_EXPIRATION: '7d',
+  JWT_SECRET: 'worldmeds-secret-key',
+  JWT_EXPIRATION: '24h',
   
   // Database configuration
-  DB_HOST: process.env.DB_HOST || 'localhost',
-  DB_USER: process.env.DB_USER || 'worldmeds_user',
-  DB_PASSWORD: process.env.DB_PASSWORD || '1234',
-  DB_NAME: process.env.DB_NAME || 'worldmeds_db',
+  DB_HOST: 'localhost',
+  DB_USER: 'worldmeds_user',
+  DB_PASSWORD: '1234',
+  DB_NAME: 'worldmeds_db',
+  
+  // API configuration
+  API_URL: 'http://localhost:3001',
+  FRONTEND_URL: 'http://localhost:5173',
   
   // CORS configuration
-  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:8080',
+  ALLOWED_ORIGINS: ['http://localhost:8080', 'http://localhost:5173'],
   
   // File upload configuration
-  UPLOAD_DIR: process.env.UPLOAD_DIR || 'public/uploads',
+  UPLOAD_DIR: 'public/uploads',
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   
   // Use these settings in production
-  isProduction: () => process.env.NODE_ENV === 'production'
+  isProduction: () => false,
+  
+  // Security settings
+  RATE_LIMIT_WINDOW: 15 * 60 * 1000, // 15 minutes
+  RATE_LIMIT_MAX: 100, // 100 requests per window
+  PASSWORD_SALT_ROUNDS: 10
 }; 

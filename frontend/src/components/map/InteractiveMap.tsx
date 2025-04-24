@@ -11,6 +11,8 @@ import { useMapContext } from "@/contexts/MapContext";
 import { MapControls } from "./MapControls";
 import { CountryMarker } from "./CountryMarker";
 import { CountryDetail } from "./CountryDetail";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 interface CountryData {
   countryId: string;
@@ -29,7 +31,7 @@ interface MedicineData {
 }
 
 interface InteractiveMapProps {
-  onCountryClick?: (countryName: string) => void;
+  onCountryClick?: (country: { id: string; name: string; averagePrice: number; totalMedicines: number }) => void;
 }
 
 const geoUrl = "/features.json";
@@ -71,6 +73,7 @@ const countryCodeMap: Record<string, string> = {
 
 const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
   const { visualizationType, darkMode, selectedDate, dateRange } = useMapContext();
+  const { isAuthenticated } = useAuth();
   const [position, setPosition] = useState({
     coordinates: [20, 45] as [number, number],
     zoom: 1.2,
@@ -118,22 +121,32 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         dateParam = `?start=${from}${to ? `&end=${to}` : ''}`;
       }
 
-      const [globalRes, countriesRes] = await Promise.all([
-        api.get(`/global-average-medicine-price${dateParam}`),
-        api.get(`/countries-average-prices${dateParam}`),
-      ]);
+      // Default values in case of 401 errors
+      let globalAverageValue = 10; // Default global average
+      let countriesDataValue: any[] = []; // Default empty countries data
 
-      setGlobalAverage(globalRes.data.global_average || 10);
+      try {
+        const globalRes = await api.get(`/global-average-medicine-price${dateParam}`);
+        globalAverageValue = globalRes.data.global_average || globalAverageValue;
+      } catch (error) {
+        console.warn("Could not fetch global average price, using default value", error);
+      }
+
+      try {
+        const countriesRes = await api.get(`/countries-average-prices${dateParam}`);
+        // Add country codes to the data
+        countriesDataValue = countriesRes.data.map((country: any) => ({
+          ...country,
+          countryCode: countryCodeMap[country.countryName] || 'un' // Default to UN flag if code not found
+        }));
+      } catch (error) {
+        console.warn("Could not fetch countries data, using default value", error);
+      }
       
-      // Add country codes to the data
-      const countriesWithCodes = countriesRes.data.map((country: any) => ({
-        ...country,
-        countryCode: countryCodeMap[country.countryName] || 'un' // Default to UN flag if code not found
-      }));
-      
-      setCountriesData(countriesWithCodes);
+      setGlobalAverage(globalAverageValue);
+      setCountriesData(countriesDataValue);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error in fetchData:", error);
     } finally {
       setLoading(false);
     }
@@ -196,55 +209,45 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       (c) => c.countryName.toLowerCase() === countryName.toLowerCase()
     );
   
-    // Call the parent component's handler
-    onCountryClick?.(countryName);
-  
+    // If we didn't find the country in our data, we can't proceed
     if (!country) {
       console.log("Country not found in data:", countryName);
+      toast({
+        title: "No Data Available",
+        description: `${countryName} has no medicine data available.`,
+        variant: "destructive"
+      });
+      return;
+    }
+  
+    // Check if the country has data (averagePrice and totalMedicines)
+    if (!country.averagePrice && !country.totalMedicines) {
+      console.log("Country has no data:", countryName);
+      toast({
+        title: "No Data Available",
+        description: `${countryName} has no medicine data available.`,
+        variant: "destructive"
+      });
       return;
     }
   
     console.log("Found country data:", country);
+    
+    // Create a proper country object to pass to the parent handler
+    const countryObject = {
+      id: country.countryId,
+      name: country.countryName,
+      averagePrice: country.averagePrice,
+      totalMedicines: country.totalMedicines
+    };
+    
+    // Call the parent component's handler with the properly structured country object
+    onCountryClick?.(countryObject);
   
-    try {
-      console.log(`Fetching top medicines for country ID: ${country.countryId}`);
-      const response = await api.get(
-        `/country/${country.countryId}/top-medicines`
-      );
-      console.log("API response:", response.data);
-      
-      // Always set the country ID to show the detail panel regardless of visualization type
-      console.log("Setting detailCountryId:", country.countryId);
-      setDetailCountryId(country.countryId);
-      
-      if (visualizationType === "markers") {
-        // Validate coordinates to prevent NaN
-        let coordinates: [number, number] = [0, 0];
-        
-        if (geo.geometry && 
-            Array.isArray(geo.geometry.coordinates) && 
-            geo.geometry.coordinates.length >= 2 &&
-            !isNaN(parseFloat(geo.geometry.coordinates[0])) && 
-            !isNaN(parseFloat(geo.geometry.coordinates[1]))) {
-          coordinates = [
-            parseFloat(geo.geometry.coordinates[0]),
-            parseFloat(geo.geometry.coordinates[1])
-          ];
-        }
-        
-        console.log("Setting selectedCountry with coordinates:", coordinates);
-        setSelectedCountry({
-          id: country.countryId,
-          name: countryName,
-          code: country.countryCode || 'un',
-          coordinates,
-          medicines: response.data,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching country details:", error);
-    }
-  }, [countriesData, onCountryClick, visualizationType]);
+    // Always set the country ID to show the detail panel regardless of authentication
+    console.log("Setting detailCountryId:", country.countryId);
+    setDetailCountryId(country.countryId);
+  }, [countriesData, onCountryClick, toast]);
 
   const handleZoomIn = useCallback(() => {
     setPosition((prev) => ({ ...prev, zoom: Math.min(prev.zoom * 1.5, 8) }));
@@ -302,7 +305,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
           center={position.coordinates}
           onMoveStart={handleMoveStart}
           onMoveEnd={handleMoveEnd}
-          filterZoomEvent={(evt) => evt.type === 'wheel' ? !evt.ctrlKey : true}
+          filterZoomEvent={(evt: any) => evt.type === 'wheel' ? !evt.ctrlKey : true}
         >
           <Geographies geography={geoUrl}>
             {({ geographies }) =>
@@ -351,12 +354,6 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       <MapControls 
         onZoomIn={handleZoomIn} 
         onZoomOut={handleZoomOut} 
-      />
-
-      {/* Country details modal */}
-      <CountryDetail 
-        countryId={detailCountryId} 
-        onClose={() => setDetailCountryId(null)} 
       />
     </div>
   );

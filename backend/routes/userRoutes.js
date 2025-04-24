@@ -3,6 +3,15 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const { authenticate } = require('../middleware/auth');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'profile-pictures');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log(`Created directory for uploads: ${uploadDir}`);
+}
 
 // Configure multer for memory storage (we'll process the files manually)
 const upload = multer({ 

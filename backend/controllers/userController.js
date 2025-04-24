@@ -8,8 +8,17 @@ const mkdirp = require('mkdirp');
 // Helper to get absolute URL for uploads
 const getUploadUrl = (relativePath) => {
   // This should match your API domain and base path
-  const apiBaseUrl = 'http://localhost:3001'; 
-  return `${apiBaseUrl}${relativePath}`;
+  const apiBaseUrl = process.env.API_URL || 'http://localhost:3001'; 
+  // Make sure the path starts with a slash
+  const normalizedPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  return `${apiBaseUrl}${normalizedPath}`;
+};
+
+// Get uploads directory path that works in both dev and Docker environments
+const getUploadsDir = () => {
+  // Check if we're in a Docker environment
+  const basePath = fs.existsSync('/usr/src/app') ? '/usr/src/app' : path.join(__dirname, '..');
+  return path.join(basePath, 'public', 'uploads', 'profile-pictures');
 };
 
 // Get the current user's profile
@@ -53,14 +62,19 @@ exports.updateProfile = async (req, res) => {
     if (req.file) {
       // Save the file path relative to the uploads directory
       const filename = `user_${userId}_${Date.now()}${path.extname(req.file.originalname)}`;
-      const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'profile-pictures');
+      const uploadDir = getUploadsDir();
       const filePath = path.join(uploadDir, filename);
       
-      // Ensure directory exists
-      await mkdirp(uploadDir);
+      console.log('Update profile - Upload directory:', uploadDir);
+      console.log('File path:', filePath);
       
-      // Write the file
+      // Ensure directory exists using mkdirp
+      await mkdirp(uploadDir);
+      console.log(`Created/Verified directory: ${uploadDir}`);
+      
+      // Write the file using the promisified writeFile
       await writeFile(filePath, req.file.buffer);
+      console.log(`File saved to: ${filePath}`);
       
       // Store relative path in database
       updateData.profilePicture = `/uploads/profile-pictures/${filename}`;
@@ -108,15 +122,26 @@ exports.uploadProfilePicture = async (req, res) => {
     }
     
     // Create uploads directory if it doesn't exist
-    const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'profile-pictures');
+    const uploadDir = getUploadsDir();
+    
+    console.log('Upload directory path:', uploadDir);
+    console.log('Directory exists before mkdirp:', fs.existsSync(uploadDir));
+    
+    // Ensure directory exists using mkdirp
     await mkdirp(uploadDir);
+    console.log('Directory exists after mkdirp:', fs.existsSync(uploadDir));
+    console.log(`Created/Verified directory: ${uploadDir}`);
     
     // Create a unique filename based on user ID and timestamp
     const filename = `user_${userId}_${Date.now()}${path.extname(req.file.originalname)}`;
     const filePath = path.join(uploadDir, filename);
     
-    // Write the file to disk
+    console.log('File will be saved to:', filePath);
+    
+    // Write the file to disk using promisified writeFile
     await writeFile(filePath, req.file.buffer);
+    console.log('File exists after writing:', fs.existsSync(filePath));
+    console.log(`File saved to: ${filePath}`);
     
     // Update the user's profile with the new image path - store as relative path
     const profilePicturePath = `/uploads/profile-pictures/${filename}`;
@@ -124,6 +149,8 @@ exports.uploadProfilePicture = async (req, res) => {
     
     // Return an absolute URL for the frontend to use
     const profilePictureUrl = getUploadUrl(profilePicturePath);
+    
+    console.log(`Profile picture updated for user ${userId}: ${profilePictureUrl}`);
     
     res.status(200).json({
       success: true,

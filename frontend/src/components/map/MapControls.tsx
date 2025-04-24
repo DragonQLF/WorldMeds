@@ -34,14 +34,8 @@ export const MapControls: React.FC<MapControlsProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  const bgClass = darkMode 
-    ? "bg-gray-800 text-white border-gray-700" 
-    : "bg-white text-gray-700 border-gray-200";
-
   const controlClass = "w-8 h-8 flex items-center justify-center transition-transform duration-200 hover:scale-110";
-  const activeClass = darkMode 
-    ? "bg-purple-900 border-purple-600 text-white"
-    : "bg-blue-100 border-blue-500 text-[#007AFF]";
+  const activeClass = "bg-blue-100 dark:bg-purple-900 border-blue-500 dark:border-purple-600 text-[#007AFF] dark:text-white";
 
   return (
     <div 
@@ -50,30 +44,31 @@ export const MapControls: React.FC<MapControlsProps> = ({
       }`}
     >
       {/* Date control */}
-      <div className={`flex flex-col gap-1 p-1 rounded-lg ${bgClass} border shadow-lg transition-all duration-200 hover:shadow-xl`}>
+      <div className="flex flex-col gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
         <Popover>
           <PopoverTrigger asChild>
             <Button 
               variant="ghost" 
               size="icon" 
-              className={cn(controlClass, bgClass)}
+              className={cn(controlClass)}
             >
               <Calendar className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
+          <PopoverContent className="w-auto p-0 bg-background dark:bg-background border dark:border-border" align="end">
             <CalendarComponent
               mode="single"
               selected={selectedDate || undefined}
               onSelect={(date) => date && setSelectedDate(date)}
               initialFocus
+              className="bg-background dark:bg-background text-foreground dark:text-foreground"
             />
           </PopoverContent>
         </Popover>
       </div>
       
       {/* Visualization controls as a toggle switch */}
-      <div className={`flex flex-col gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 border border-blue-500 dark:border-purple-600 shadow-lg transition-all duration-200 hover:shadow-xl`}>
+      <div className="flex flex-col gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
         <div className="flex flex-col gap-1">
           <Button
             variant="ghost"
@@ -101,13 +96,13 @@ export const MapControls: React.FC<MapControlsProps> = ({
       </div>
       
       {/* Zoom Controls */}
-      <div className={`flex flex-col gap-1 p-1 rounded-lg ${bgClass} border shadow-lg transition-all duration-200 hover:shadow-xl`}>
+      <div className="flex flex-col gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
         <div className="grid grid-cols-1 gap-1">
           <Button 
             onClick={onZoomIn} 
             variant="ghost" 
             size="icon" 
-            className={cn(controlClass, bgClass, "active:scale-95")}
+            className={cn(controlClass, "active:scale-95")}
           >
             <ZoomIn className="h-3 w-3" />
           </Button>
@@ -115,7 +110,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
             onClick={onZoomOut} 
             variant="ghost" 
             size="icon" 
-            className={cn(controlClass, bgClass, "active:scale-95")}
+            className={cn(controlClass, "active:scale-95")}
           >
             <ZoomOut className="h-3 w-3" />
           </Button>

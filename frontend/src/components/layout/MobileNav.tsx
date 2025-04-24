@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { XIcon, Moon, Sun, LogIn, User, LogOut, Upload, Save, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useSidebar } from "@/hooks/useSidebar";
 import { SidebarLogo } from "./SidebarLogo";
@@ -50,7 +50,7 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   const { navigationItems } = useSidebar();
-  const { darkMode, setDarkMode } = useMapContext();
+  const { darkMode, toggleDarkMode } = useMapContext();
   const { isAuthenticated, user, logout, updateProfile, changePassword, uploadProfilePicture } = useAuth();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -81,23 +81,56 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   });
 
   // Update form values when user changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       profileForm.reset({
         firstName: user.firstName || "",
         lastName: user.lastName || "",
         email: user.email || "",
       });
-      setProfilePhotoUrl(user.profilePicture || null);
+      // Add cache-busting query parameter to avoid browser caching
+      const cacheBuster = `?t=${Date.now()}`;
+      setProfilePhotoUrl(user.profilePicture ? `${user.profilePicture}${cacheBuster}` : null);
     }
   }, [user, profileForm]);
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
+  // Add this somewhere at the top level of the component
+  useEffect(() => {
+    // Function to check if an image URL is valid
+    const validateImageUrl = async (url: string) => {
+      if (!url) return false;
+      
+      try {
+        // First try a HEAD request to check if the image exists
+        const response = await fetch(url, { method: 'HEAD' });
+        return response.ok;
+      } catch (error) {
+        console.error("Error validating image URL:", error);
+        return false;
+      }
+    };
+    
+    // Validate profile photo URL if it exists
+    const checkProfilePhoto = async () => {
+      if (profilePhotoUrl) {
+        const isValid = await validateImageUrl(profilePhotoUrl);
+        
+        if (!isValid) {
+          console.warn("Profile image not found, falling back to initials");
+          setProfilePhotoUrl(null);
+        }
+      }
+    };
+    
+    checkProfilePhoto();
+  }, [profilePhotoUrl]);
 
   const handleLoginClick = () => {
-    navigate("/auth/login");
+    // Dispatch event to open login modal
+    const event = new CustomEvent('open-auth-modal', { 
+      detail: { type: 'login' } 
+    });
+    window.dispatchEvent(event);
     onClose();
   };
 
@@ -115,20 +148,37 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
     const file = event.target.files?.[0];
     if (!file) return;
     
-    setIsUploading(true);
-    
     try {
-      // Create a temporary URL for preview
-      const previewUrl = URL.createObjectURL(file);
-      setProfilePhotoUrl(previewUrl);
+      setIsUploading(true);
+      
+      // Reset file input value to allow selecting the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       
       // Upload to server
-      const uploadedUrl = await uploadProfilePicture(file);
+      const result = await uploadProfilePicture(file);
       
-      if (!uploadedUrl) {
-        // If upload failed, revert preview
-        setProfilePhotoUrl(user?.profilePicture || null);
-        URL.revokeObjectURL(previewUrl);
+      if (!result.success) {
+        console.error("Failed to upload profile picture:", result.message);
+        toast({
+          title: "Upload failed",
+          description: result.message || "Could not upload profile picture",
+          variant: "destructive"
+        });
+      } else {
+        // Set the profile photo URL with cache busting
+        const cacheBuster = `?t=${Date.now()}`;
+        const pictureUrl = result.profilePicture.includes('?') 
+          ? result.profilePicture 
+          : `${result.profilePicture}${cacheBuster}`;
+          
+        setProfilePhotoUrl(pictureUrl);
+        
+        toast({
+          title: "Photo uploaded",
+          description: "Your profile photo has been updated"
+        });
       }
     } catch (error) {
       console.error("Error uploading profile picture:", error);
@@ -137,13 +187,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
         title: "Upload failed",
         description: "Could not upload profile picture",
       });
-      setProfilePhotoUrl(user?.profilePicture || null);
     } finally {
       setIsUploading(false);
-      // Clear the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -432,7 +477,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                       >
                                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+                                  </button>
         </div>
                                   </FormControl>
                                   <FormMessage />

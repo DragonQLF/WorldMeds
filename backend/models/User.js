@@ -1,11 +1,11 @@
 const db = require('../db');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 class User {
   // Find a user by their ID
   static async findById(id) {
     return new Promise((resolve, reject) => {
-      const query = 'SELECT id, first_name, last_name, email, profile_picture FROM users WHERE id = ?';
+      const query = 'SELECT id, first_name, last_name, email FROM users WHERE id = ?';
       db.query(query, [id], (err, results) => {
         if (err) return reject(err);
         
@@ -18,8 +18,7 @@ class User {
           id: results[0].id,
           firstName: results[0].first_name,
           lastName: results[0].last_name,
-          email: results[0].email,
-          profilePicture: results[0].profile_picture
+          email: results[0].email
         };
         
         resolve(user);
@@ -91,11 +90,6 @@ class User {
       if (userData.email !== undefined) {
         updates.push('email = ?');
         queryParams.push(userData.email);
-      }
-      
-      if (userData.profilePicture !== undefined) {
-        updates.push('profile_picture = ?');
-        queryParams.push(userData.profilePicture);
       }
       
       // If there's nothing to update
