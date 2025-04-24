@@ -28,8 +28,11 @@ CREATE TABLE IF NOT EXISTS users (
   last_name VARCHAR(100),
   email VARCHAR(100) UNIQUE,
   password VARCHAR(255),
-  profile_picture VARCHAR(255) NULL
+  role ENUM('user', 'admin') NOT NULL DEFAULT 'user'
 );
+
+-- Create an index on the role column for faster queries
+CREATE INDEX idx_users_role ON users(role);
 
 -- Insert example data
 INSERT INTO paises (nome, moeda) 

@@ -25,6 +25,12 @@ const ProtectedRoute: React.FC = () => {
         description: `Please log in to access the ${pageName} page.`,
         variant: "default",
       });
+      
+      // Dispatch event to open login modal
+      const event = new CustomEvent('open-auth-modal', { 
+        detail: { type: 'login' } 
+      });
+      window.dispatchEvent(event);
     }
   }, [isAuthenticated, isLoading, location.pathname]);
 
@@ -33,9 +39,9 @@ const ProtectedRoute: React.FC = () => {
     return null; // Or return a loading spinner if preferred
   }
 
-  // If not authenticated, redirect to login page
+  // If not authenticated, redirect to home page
   if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // Otherwise, render the child routes (protected content)

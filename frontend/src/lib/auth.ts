@@ -126,6 +126,9 @@ export const auth = {
       const formData = new FormData();
       formData.append("profilePicture", file);
       
+      // Add cache-busting parameter to prevent browser caching
+      const cacheBuster = `?t=${Date.now()}`;
+      
       const response = await api.post("/upload-profile-picture", formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -135,9 +138,14 @@ export const auth = {
       if (response.data.success) {
         // Update user in localStorage
         const currentUser = this.getUser();
+        // Add cache-busting parameter to the URL to force image refresh
+        const profilePictureWithCache = response.data.profilePicture.includes('?') 
+          ? `${response.data.profilePicture}&t=${Date.now()}` 
+          : `${response.data.profilePicture}${cacheBuster}`;
+          
         const updatedUser = { 
           ...currentUser, 
-          profilePicture: response.data.profilePicture 
+          profilePicture: profilePictureWithCache
         };
         localStorage.setItem("user", JSON.stringify(updatedUser));
       }
@@ -168,7 +176,7 @@ export const auth = {
   logout() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user");
-    window.location.href = "/auth/login";
+    window.location.href = "/";
   },
 
   isAuthenticated() {

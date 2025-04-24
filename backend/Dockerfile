@@ -1,4 +1,4 @@
-FROM node:23.11.0-slim
+FROM node:23-slim
 
 WORKDIR /usr/src/app
 
@@ -9,6 +9,8 @@ COPY . .
 
 # Ensure the backend listens on all network interfaces
 ENV HOST=0.0.0.0
+# Set the API URL for profile pictures and other resources
+ENV API_URL=http://localhost:3001
 
 EXPOSE 3001
 

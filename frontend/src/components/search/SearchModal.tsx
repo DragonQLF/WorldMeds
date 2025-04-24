@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMapContext } from "@/contexts/MapContext";
 import { api } from "@/lib/api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface SearchResult {
   id: number;
@@ -22,6 +29,8 @@ interface SearchResult {
   dosage?: string;
   averagePrice?: number;
   totalMedicines?: number;
+  currency?: string;
+  countryCount?: number;
   [key: string]: any;
 }
 
@@ -35,46 +44,31 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const { darkMode } = useMapContext();
   
-  // Query for popular/trending items that will show by default
-  const { data: popularItems = [], isLoading: isLoadingPopular } = useQuery({
-    queryKey: [type, 'popular'],
+  // Query for all countries/medicines data
+  const { data: allItems = [], isLoading: isLoadingAll } = useQuery({
+    queryKey: [type, 'all-items'],
     queryFn: async () => {
       if (!open) return [];
       
       const endpoint = type === "country" 
-        ? `/popular-countries`
-        : `/popular-medicines`;
+        ? `/countries`
+        : `/medicines`;
       
       try {
+        console.log(`Fetching all ${type}s data from ${endpoint}`);
         const response = await api.get(endpoint);
+        console.log(`Received ${type}s data:`, response.data);
         return response.data;
       } catch (error) {
-        console.error("Error fetching popular items:", error);
-        // Return mock data if API fails
-        if (type === "country") {
-          return [
-            { id: 1, name: "United States", totalMedicines: 1240, averagePrice: 45.99 },
-            { id: 2, name: "Brazil", totalMedicines: 980, averagePrice: 23.50 },
-            { id: 3, name: "Germany", totalMedicines: 890, averagePrice: 38.75 },
-            { id: 4, name: "India", totalMedicines: 1450, averagePrice: 12.30 },
-            { id: 5, name: "Japan", totalMedicines: 760, averagePrice: 56.20 }
-          ];
-        } else {
-          return [
-            { id: 1, name: "Paracetamol", dosage: "500mg", averagePrice: 5.99 },
-            { id: 2, name: "Amoxicillin", dosage: "250mg", averagePrice: 12.50 },
-            { id: 3, name: "Ibuprofen", dosage: "400mg", averagePrice: 8.75 },
-            { id: 4, name: "Lisinopril", dosage: "10mg", averagePrice: 24.30 },
-            { id: 5, name: "Metformin", dosage: "500mg", averagePrice: 18.20 }
-          ];
-        }
+        console.error(`Error fetching all ${type}s:`, error);
+        return [];
       }
     },
     enabled: open,
   });
   
-  // Query for search results
-  const { data: results = [], isLoading } = useQuery({
+  // Query for search results only when a search term is entered
+  const { data: searchResults = [], isLoading: isSearching } = useQuery({
     queryKey: [type, 'search', searchTerm, open],
     queryFn: async () => {
       if (!open || !searchTerm) return [];
@@ -91,7 +85,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
         return [];
       }
     },
-    enabled: open && !!searchTerm,
+    enabled: open && searchTerm.length >= 2,
   });
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,12 +98,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
   };
   
   // Determine which items to display
-  const displayItems = searchTerm ? results : popularItems;
-  const isLoadingItems = searchTerm ? isLoading : isLoadingPopular;
+  const displayItems = searchTerm.length >= 2 ? searchResults : allItems;
+  const isLoading = searchTerm.length >= 2 ? isSearching : isLoadingAll;
   
   // Format price to display
   const formatPrice = (price?: number) => {
-    if (typeof price !== 'number') return 'N/A';
+    if (typeof price !== 'number' || isNaN(price)) return 'N/A';
     return `$${price.toFixed(2)}`;
   };
   
@@ -125,11 +119,11 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
           {type === "country" ? "Search Countries" : "Search Medicines"}
         </Button>
       </DialogTrigger>
-      <DialogContent className={`sm:max-w-md ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'}`}>
+      <DialogContent className={`sm:max-w-2xl ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'}`}>
         <DialogHeader>
-          <DialogTitle>{type === "country" ? "Search Countries" : "Search Medicines"}</DialogTitle>
+          <DialogTitle>{type === "country" ? "Countries" : "Medicines"}</DialogTitle>
           <DialogDescription className={darkMode ? 'text-gray-300' : 'text-gray-500'}>
-            {searchTerm ? "Search results" : "Popular items"}
+            {searchTerm.length >= 2 ? `Search results for "${searchTerm}"` : "All available items"}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -142,40 +136,49 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
             value={searchTerm}
           />
           
-          <div className={`space-y-2 max-h-[50vh] overflow-y-auto ${darkMode ? 'scrollbar-dark' : 'scrollbar-light'}`}>
-            {isLoadingItems && <p className="text-center py-4">Loading...</p>}
-            
-            {!isLoadingItems && displayItems.length === 0 && searchTerm && (
-              <p className="text-center py-4">No results found</p>
+          <div className={`max-h-[50vh] overflow-y-auto ${darkMode ? 'scrollbar-dark' : 'scrollbar-light'}`}>
+            {isLoading ? (
+              <p className="text-center py-4">Loading...</p>
+            ) : displayItems.length === 0 ? (
+              <p className="text-center py-4">No items found</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    {type === "medicine" && <TableHead>Dosage</TableHead>}
+                    {type === "country" && <TableHead>Currency</TableHead>}
+                    <TableHead>{type === "country" ? "Medicines" : "Countries"}</TableHead>
+                    <TableHead>Avg. Price</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {displayItems.map((item: SearchResult) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      {type === "medicine" && <TableCell>{item.dosage || 'N/A'}</TableCell>}
+                      {type === "country" && <TableCell>{item.currency || 'N/A'}</TableCell>}
+                      <TableCell>
+                        {type === "country" 
+                          ? (item.totalMedicines !== undefined ? item.totalMedicines : 'N/A') 
+                          : (item.countryCount !== undefined ? item.countryCount : 'N/A')}
+                      </TableCell>
+                      <TableCell>{item.averagePrice !== undefined ? formatPrice(item.averagePrice) : 'N/A'}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSelect(item)}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-            
-            {!isLoadingItems && displayItems.length === 0 && !searchTerm && (
-              <p className="text-center py-4">No popular items found</p>
-            )}
-            
-            {displayItems.map((item: SearchResult) => (
-              <Button
-                key={item.id}
-                variant="ghost"
-                className={`w-full justify-start text-left p-3 h-auto ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                onClick={() => handleSelect(item)}
-              >
-                <div className="flex flex-col items-start">
-                  <div className="font-medium">{item.name}</div>
-                  <div className="text-xs opacity-70 flex gap-2 mt-1">
-                    {type === "medicine" && item.dosage && (
-                      <span>{item.dosage}</span>
-                    )}
-                    {item.averagePrice !== undefined && (
-                      <span>{formatPrice(item.averagePrice)}</span>
-                    )}
-                    {type === "country" && item.totalMedicines !== undefined && (
-                      <span>{item.totalMedicines} medicines</span>
-                    )}
-                  </div>
-                </div>
-              </Button>
-            ))}
           </div>
         </div>
       </DialogContent>

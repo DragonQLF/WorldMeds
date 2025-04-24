@@ -4,40 +4,151 @@ const cors = require("cors");
 const path = require('path');
 const fs = require('fs');
 const mkdirp = require('mkdirp');
+const { authenticateOptional } = require('./middleware/auth');
+const multer = require("multer");
+const config = require('./config');
 
 const app = express();
-const port = 3001;
+const port = config.PORT;
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'public', 'uploads', 'profile-pictures');
-mkdirp.sync(uploadsDir);
-console.log(`Uploads directory ready: ${uploadsDir}`);
+// Get base directory that works for both dev and Docker environments
+const getBaseDir = () => {
+  return fs.existsSync('/usr/src/app') ? '/usr/src/app' : __dirname;
+};
 
 // Updated CORS configuration
 app.use(cors({
-  origin: "http://localhost:8080", // Allow requests from the frontend
-  credentials: true, // Allow credentials
+  origin: config.ALLOWED_ORIGINS,
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.use(express.json());
 
-// Import the config
-const config = require('./config');
-
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+
+// ✅ Get global average medicine price - Moving this before user routes so it doesn't require auth
+app.get("/api/global-average-medicine-price", (req, res) => {
+  let sql = `
+    SELECT AVG(overall_average) AS global_average FROM (
+      SELECT p.id,
+        (
+          SELECT AVG(sub.avg_price) FROM (
+            SELECT AVG(mp.preco_venda) AS avg_price
+            FROM medicamentos_paises mp
+            WHERE mp.pais_id = p.id
+  `;
+  
+  const params = [];
+  
+  if (req.query.date) {
+    sql += ` AND DATE(mp.mes) = ?`;
+    params.push(req.query.date);
+  } else if (req.query.start) {
+    sql += ` AND DATE(mp.mes) >= ?`;
+    params.push(req.query.start);
+    
+    if (req.query.end) {
+      sql += ` AND DATE(mp.mes) <= ?`;
+      params.push(req.query.end);
+    }
+  }
+  
+  sql += `
+            GROUP BY mp.medicamento_id
+            ORDER BY SUM(mp.quantidade_comprada) DESC
+            LIMIT 5
+          ) AS sub
+        ) AS overall_average
+      FROM paises p
+    ) AS t;
+  `;
+  
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Error fetching global average:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results[0]);
+  });
+});
+
+// New Endpoint: Get average prices for all countries - Moving this before user routes so it doesn't require auth
+app.get("/api/countries-average-prices", (req, res) => {
+  let sql = `
+    SELECT 
+      p.id AS countryId,
+      p.nome AS countryName,
+      (
+        SELECT AVG(sub.avg_price)
+        FROM (
+          SELECT AVG(mp.preco_venda) AS avg_price
+          FROM medicamentos_paises mp
+          WHERE mp.pais_id = p.id
+  `;
+  
+  const params = [];
+  
+  if (req.query.date) {
+    sql += ` AND DATE(mp.mes) = ?`;
+    params.push(req.query.date);
+  } else if (req.query.start) {
+    sql += ` AND DATE(mp.mes) >= ?`;
+    params.push(req.query.start);
+    
+    if (req.query.end) {
+      sql += ` AND DATE(mp.mes) <= ?`;
+      params.push(req.query.end);
+    }
+  }
+  
+  sql += `
+          GROUP BY mp.medicamento_id
+          ORDER BY SUM(mp.quantidade_comprada) DESC
+          LIMIT 5
+        ) AS sub
+      ) AS averagePrice,
+      (
+        SELECT SUM(mp2.quantidade_comprada)
+        FROM medicamentos_paises mp2
+        WHERE mp2.pais_id = p.id
+  `;
+  
+  if (req.query.date) {
+    sql += ` AND DATE(mp2.mes) = ?`;
+    params.push(req.query.date);
+  } else if (req.query.start) {
+    sql += ` AND DATE(mp2.mes) >= ?`;
+    params.push(req.query.start);
+    
+    if (req.query.end) {
+      sql += ` AND DATE(mp2.mes) <= ?`;
+      params.push(req.query.end);
+    }
+  }
+  
+  sql += `
+      ) AS totalMedicines
+    FROM paises p;
+  `;
+  
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Error fetching countries averages:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
 
 // Use auth routes
 app.use('/api', authRoutes);
 
 // Use user routes
 app.use('/api', userRoutes);
-
-// Serve static files from the public directory
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // ✅ Get all countries
 app.get("/api/countries", (req, res) => {
@@ -91,52 +202,6 @@ app.get("/api/country/:countryId/average-medicine-price", (req, res) => {
   });
 });
 
-// ✅ Get global average medicine price
-app.get("/api/global-average-medicine-price", (req, res) => {
-  let sql = `
-    SELECT AVG(overall_average) AS global_average FROM (
-      SELECT p.id,
-        (
-          SELECT AVG(sub.avg_price) FROM (
-            SELECT AVG(mp.preco_venda) AS avg_price
-            FROM medicamentos_paises mp
-            WHERE mp.pais_id = p.id
-  `;
-  
-  const params = [];
-  
-  if (req.query.date) {
-    sql += ` AND DATE(mp.mes) = ?`;
-    params.push(req.query.date);
-  } else if (req.query.start) {
-    sql += ` AND DATE(mp.mes) >= ?`;
-    params.push(req.query.start);
-    
-    if (req.query.end) {
-      sql += ` AND DATE(mp.mes) <= ?`;
-      params.push(req.query.end);
-    }
-  }
-  
-  sql += `
-            GROUP BY mp.medicamento_id
-            ORDER BY SUM(mp.quantidade_comprada) DESC
-            LIMIT 5
-          ) AS sub
-        ) AS overall_average
-      FROM paises p
-    ) AS t;
-  `;
-  
-  db.query(sql, params, (err, results) => {
-    if (err) {
-      console.error("Error fetching global average:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results[0]);
-  });
-});
-
 // ✅ Get country details
 app.get("/api/country/:countryId/details", (req, res) => {
   let sql = `
@@ -144,7 +209,11 @@ app.get("/api/country/:countryId/details", (req, res) => {
       p.nome AS name,
       p.moeda AS currency,
       SUM(mp.quantidade_comprada) AS total_medicines,
-      AVG(mp.preco_venda) AS avg_price
+      AVG(COALESCE(
+        mp.preco_venda / NULLIF(mp.quantidade_comprada, 0), 
+        mp.preco_referencia / NULLIF(mp.quantidade_comprada, 0)
+      )) AS avg_price,
+      MAX(CASE WHEN mp.preco_venda IS NULL THEN 1 ELSE 0 END) AS using_reference_price
     FROM medicamentos_paises mp
     JOIN paises p ON mp.pais_id = p.id
     WHERE p.id = ?
@@ -337,82 +406,18 @@ app.get("/api/country/:countryId/medicine/:medicineId", (req, res) => {
   });
 });
 
-// New Endpoint: Get average prices for all countries
-app.get("/api/countries-average-prices", (req, res) => {
-  let sql = `
-    SELECT 
-      p.id AS countryId,
-      p.nome AS countryName,
-      (
-        SELECT AVG(sub.avg_price)
-        FROM (
-          SELECT AVG(mp.preco_venda) AS avg_price
-          FROM medicamentos_paises mp
-          WHERE mp.pais_id = p.id
-  `;
-  
-  const params = [];
-  
-  if (req.query.date) {
-    sql += ` AND DATE(mp.mes) = ?`;
-    params.push(req.query.date);
-  } else if (req.query.start) {
-    sql += ` AND DATE(mp.mes) >= ?`;
-    params.push(req.query.start);
-    
-    if (req.query.end) {
-      sql += ` AND DATE(mp.mes) <= ?`;
-      params.push(req.query.end);
-    }
-  }
-  
-  sql += `
-          GROUP BY mp.medicamento_id
-          ORDER BY SUM(mp.quantidade_comprada) DESC
-          LIMIT 5
-        ) AS sub
-      ) AS averagePrice,
-      (
-        SELECT SUM(mp2.quantidade_comprada)
-        FROM medicamentos_paises mp2
-        WHERE mp2.pais_id = p.id
-  `;
-  
-  if (req.query.date) {
-    sql += ` AND DATE(mp2.mes) = ?`;
-    params.push(req.query.date);
-  } else if (req.query.start) {
-    sql += ` AND DATE(mp2.mes) >= ?`;
-    params.push(req.query.start);
-    
-    if (req.query.end) {
-      sql += ` AND DATE(mp2.mes) <= ?`;
-      params.push(req.query.end);
-    }
-  }
-  
-  sql += `
-      ) AS totalMedicines
-    FROM paises p;
-  `;
-  
-  db.query(sql, params, (err, results) => {
-    if (err) {
-      console.error("Error fetching countries averages:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
-});
-
 // Updated Endpoint: Get top 5 medicines for a country
 app.get("/api/country/:countryId/top-medicines", (req, res) => {
   let sql = `
     SELECT 
       m.nome AS name,
       m.dosagem AS dosage,
-      AVG(mp.preco_venda) AS averagePrice,
-      SUM(mp.quantidade_comprada) AS totalSold
+      AVG(COALESCE(
+        mp.preco_venda / NULLIF(mp.quantidade_comprada, 0), 
+        mp.preco_referencia / NULLIF(mp.quantidade_comprada, 0)
+      )) AS averagePrice,
+      SUM(mp.quantidade_comprada) AS totalSold,
+      MAX(CASE WHEN mp.preco_venda IS NULL THEN 1 ELSE 0 END) AS using_reference_price
     FROM medicamentos_paises mp
     JOIN medicamentos m ON mp.medicamento_id = m.id
     WHERE mp.pais_id = ?
@@ -610,101 +615,6 @@ app.get("/api/price-index", (req, res) => {
     }
     res.json(results);
   });
-});
-
-// Ensure the signup endpoint is properly defined
-app.post("/api/signup", async (req, res) => {
-  const { firstName, lastName, email, password } = req.body;
-
-  try {
-    // Check if user already exists
-    db.query("SELECT * FROM users WHERE email = ?", [email], async (err, results) => {
-      if (err) {
-        console.error("Database error:", err);
-        return res.status(500).json({ success: false, message: "Server error" });
-      }
-      
-      if (results.length > 0) {
-        return res.status(400).json({ success: false, message: "User already exists" });
-      }
-      
-      // Hash password before storing
-      const bcrypt = require("bcryptjs");
-      const hash = await bcrypt.hash(password, 10);
-      
-      // Insert new user
-      db.query(
-        "INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)",
-        [firstName, lastName, email, hash],
-        (err, result) => {
-          if (err) {
-            console.error("Error creating user:", err);
-            return res.status(500).json({ success: false, message: "Error creating account" });
-          }
-          
-          // Generate and return token
-          const token = "user-token-" + Math.random().toString(36).substring(2, 15);
-          
-          res.json({
-            success: true,
-            token: token,
-            user: {
-              id: result.insertId,
-              firstName,
-              lastName,
-              email
-            }
-          });
-        }
-      );
-    });
-  } catch (error) {
-    console.error("Registration error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
-// Add a login endpoint that matches the frontend expectations
-app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
-  
-  try {
-    db.query("SELECT * FROM users WHERE email = ?", [email], async (err, results) => {
-      if (err) {
-        console.error("Database error:", err);
-        return res.status(500).json({ success: false, message: "Server error" });
-      }
-      
-      if (results.length === 0) {
-        return res.status(401).json({ success: false, message: "Invalid credentials" });
-      }
-      
-      const user = results[0];
-      const bcrypt = require("bcryptjs");
-      const match = await bcrypt.compare(password, user.password);
-      
-      if (!match) {
-        return res.status(401).json({ success: false, message: "Invalid credentials" });
-      }
-      
-      // Generate and return token
-      const token = "user-token-" + Math.random().toString(36).substring(2, 15);
-      
-      res.json({
-        success: true,
-        token: token,
-        user: {
-          id: user.id,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          email: user.email
-        }
-      });
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
 });
 
 // Start server

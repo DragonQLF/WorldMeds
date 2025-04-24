@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { LogIn, LogOut, Moon, Sun, User, Upload, Save, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useMapContext } from "@/contexts/MapContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +22,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "@/hooks/use-toast";
+import { ModalType } from "@/components/Auth/AuthModals";
+import AuthModals from "@/components/Auth/AuthModals";
 
 interface SidebarFooterProps {
   isExpanded: boolean;
@@ -46,7 +48,7 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
-  const { darkMode, setDarkMode } = useMapContext();
+  const { darkMode, toggleDarkMode } = useMapContext();
   const { isAuthenticated, user, logout, updateProfile, changePassword, uploadProfilePicture } = useAuth();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -57,6 +59,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [authModalType, setAuthModalType] = useState<ModalType>(null);
 
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -88,12 +91,62 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
     }
   }, [user, profileForm]);
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
+  useEffect(() => {
+    const handleOpenAuthModal = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.type) {
+        setAuthModalType(customEvent.detail.type);
+      }
+    };
+
+    window.addEventListener('open-auth-modal', handleOpenAuthModal);
+    
+    return () => {
+      window.removeEventListener('open-auth-modal', handleOpenAuthModal);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Update the profile photo URL when the user changes
+    if (user) {
+      // Add cache-busting query parameter to avoid browser caching
+      const cacheBuster = `?t=${Date.now()}`;
+      setProfilePhotoUrl(user.profilePicture ? `${user.profilePicture}${cacheBuster}` : null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // Function to check if an image URL is valid
+    const validateImageUrl = async (url: string) => {
+      if (!url) return false;
+      
+      try {
+        // First try a HEAD request to check if the image exists
+        const response = await fetch(url, { method: 'HEAD' });
+        return response.ok;
+      } catch (error) {
+        console.error("Error validating image URL:", error);
+        return false;
+      }
+    };
+    
+    // Validate profile photo URL if it exists
+    const checkProfilePhoto = async () => {
+      if (profilePhotoUrl) {
+        const isValid = await validateImageUrl(profilePhotoUrl);
+        
+        if (!isValid) {
+          console.warn("Profile image not found, falling back to initials");
+          setProfilePhotoUrl(null);
+        }
+      }
+    };
+    
+    checkProfilePhoto();
+  }, [profilePhotoUrl]);
 
   const handleLoginClick = () => {
-    navigate("/auth/login");
+    setAuthModalType('login');
   };
 
   // Get user initials for avatar
@@ -110,35 +163,47 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
     const file = event.target.files?.[0];
     if (!file) return;
     
-    setIsUploading(true);
-    
     try {
-      // Create a temporary URL for preview
-      const previewUrl = URL.createObjectURL(file);
-      setProfilePhotoUrl(previewUrl);
+      setIsUploading(true);
+      
+      // Reset file input value to allow selecting the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       
       // Upload to server
-      const uploadedUrl = await uploadProfilePicture(file);
+      const result = await uploadProfilePicture(file);
       
-      if (!uploadedUrl) {
-        // If upload failed, revert preview
-        setProfilePhotoUrl(user?.profilePicture || null);
-        URL.revokeObjectURL(previewUrl);
+      if (!result.success) {
+        console.error("Failed to upload profile picture:", result.message);
+        toast({
+          title: "Upload failed",
+          description: result.message || "Could not upload profile picture",
+          variant: "destructive"
+        });
+      } else {
+        // Set the profile photo URL with cache busting
+        const cacheBuster = `?t=${Date.now()}`;
+        const pictureUrl = result.profilePicture.includes('?') 
+          ? result.profilePicture 
+          : `${result.profilePicture}${cacheBuster}`;
+          
+        setProfilePhotoUrl(pictureUrl);
+        
+        toast({
+          title: "Photo uploaded",
+          description: "Your profile photo has been updated"
+        });
       }
     } catch (error) {
       console.error("Error uploading profile picture:", error);
       toast({
-        variant: "destructive",
         title: "Upload failed",
         description: "Could not upload profile picture",
+        variant: "destructive"
       });
-      setProfilePhotoUrl(user?.profilePicture || null);
     } finally {
       setIsUploading(false);
-      // Clear the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -183,6 +248,18 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
 
   return (
     <footer className="flex flex-col items-start gap-4 w-full">
+      {/* Auth Modals */}
+      {authModalType && (
+        <div id="auth-modals">
+          <div>
+            <AuthModals 
+              modalType={authModalType} 
+              onClose={() => setAuthModalType(null)} 
+            />
+          </div>
+        </div>
+      )}
+
       {isAuthenticated ? (
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>
@@ -403,7 +480,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
                                   >
                                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                   </button>
-            </div>
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>

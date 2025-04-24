@@ -28,7 +28,12 @@ export default function ProfilePage() {
   // Redirect if not authenticated
   React.useEffect(() => {
     if (!isAuthenticated) {
-      navigate("/auth/login");
+      // Dispatch event to open login modal
+      const event = new CustomEvent('open-auth-modal', { 
+        detail: { type: 'login' } 
+      });
+      window.dispatchEvent(event);
+      navigate("/");
     }
   }, [isAuthenticated, navigate]);
 

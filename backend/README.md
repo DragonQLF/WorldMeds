@@ -14,12 +14,7 @@ npm install
 mysql -u root -p < init.sql
 ```
 
-3. Add the profile picture column to the users table:
-```bash
-mysql -u worldmeds_user -p worldmeds_db < migrations/add_profile_picture.sql
-```
-
-4. Start the server:
+3. Start the server:
 ```bash
 npm start
 ```
@@ -62,12 +57,7 @@ All these routes require authentication.
 
 - `PUT /api/profile` - Update user profile
   - Request body: `{ firstName, lastName, email }`
-  - Can also include form data with a `profilePicture` file
   - Response: `{ success, message, user }`
-
-- `POST /api/upload-profile-picture` - Upload a profile picture
-  - Request: Form data with a `profilePicture` file
-  - Response: `{ success, message, profilePicture }`
 
 - `PUT /api/change-password` - Change password
   - Request body: `{ currentPassword, newPassword }`
@@ -106,9 +96,6 @@ backend/
   ├── routes/
   │   ├── authRoutes.js    # Authentication routes
   │   └── userRoutes.js    # User routes
-  ├── migrations/
-  │   └── add_profile_picture.sql # Migration to add profile picture column
   └── public/
       └── uploads/         # Uploaded files
-          └── profile-pictures/ # Profile pictures
 ``` 

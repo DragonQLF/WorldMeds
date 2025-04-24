@@ -67,9 +67,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Verify token is still valid with the backend
           try {
             // Make a request to get the profile to verify the token
-            await api.get("/profile");
-            // If successful, set the user
-            setUser(storedUser);
+            const profileResponse = await api.get("/profile");
+            
+            // If the profile has a profile picture, check if it exists
+            if (profileResponse.data?.user?.profilePicture) {
+              // Set the user with verified data from the server
+              setUser(profileResponse.data.user);
+            } else {
+              // If no profile picture, just set the user
+              setUser(storedUser);
+            }
           } catch (error) {
             // If the token is invalid, clear auth data
             console.error("Invalid token, clearing auth data");
@@ -174,12 +181,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         return false;
       }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Update error",
-        description: "An unexpected error occurred",
-      });
+    } catch (error: any) {
+      // Handle specific error cases
+      if (error?.response?.data?.message === "Email already in use") {
+        toast({
+          variant: "destructive",
+          title: "Email already in use",
+          description: "This email address is already registered. Please use a different email.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Update error",
+          description: "An unexpected error occurred",
+        });
+      }
       return false;
     } finally {
       setIsLoading(false);

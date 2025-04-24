@@ -1,14 +1,19 @@
 const User = require('../models/User');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { generateToken } = require('../middleware/auth');
 
 // User registration
 exports.register = async (req, res) => {
   try {
-    const { firstName, lastName, email, password } = req.body;
+    // Support both formats of field names
+    const { first_name, last_name, firstName, lastName, email, password } = req.body;
+    
+    // Use either format that's available
+    const userFirstName = first_name || firstName;
+    const userLastName = last_name || lastName;
     
     // Validate required fields
-    if (!firstName || !lastName || !email || !password) {
+    if (!userFirstName || !userLastName || !email || !password) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -24,10 +29,10 @@ exports.register = async (req, res) => {
       });
     }
     
-    // Create new user
+    // Create new user (role will be set to 'user' by default in the database)
     const user = await User.create({
-      firstName,
-      lastName,
+      first_name: userFirstName,
+      last_name: userLastName,
       email,
       password
     });
@@ -35,10 +40,19 @@ exports.register = async (req, res) => {
     // Generate JWT token
     const token = generateToken(user.id);
     
+    // Send response with consistent field names
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      user,
+      user: {
+        id: user.id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        firstName: user.first_name, // Include both formats for compatibility
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role
+      },
       token
     });
   } catch (error) {
@@ -84,13 +98,15 @@ exports.login = async (req, res) => {
     // Generate JWT token
     const token = generateToken(user.id);
     
-    // Format user data (remove password)
+    // Format user data (remove password) and include both naming conventions
     const userData = {
       id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
       firstName: user.first_name,
       lastName: user.last_name,
       email: user.email,
-      profilePicture: user.profile_picture
+      role: user.role || 'user'
     };
     
     res.status(200).json({

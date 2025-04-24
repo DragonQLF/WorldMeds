@@ -58,7 +58,7 @@ export const Sidebar: React.FC = () => {
           <div className={`fixed top-4 left-4 z-50 transition-opacity duration-300 ease-in-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
             <button 
               onClick={toggleMobileMenu} 
-              className="p-2 rounded-md hover:bg-gray-100 transition-all duration-200 hover:shadow-md active:scale-95"
+              className="p-2 rounded-md bg-background dark:bg-background text-foreground dark:text-foreground hover:bg-accent dark:hover:bg-accent transition-all duration-200 hover:shadow-md active:scale-95"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -72,11 +72,12 @@ export const Sidebar: React.FC = () => {
   // For desktop: show sidebar
   return (
     <aside 
-      className={`flex h-screen flex-col justify-between items-start bg-background dark:bg-sidebar py-10 transition-all duration-300 ease-in-out shadow-lg ${
+      className={`flex h-screen flex-col justify-between items-start bg-background dark:bg-background border-r border-border dark:border-border py-10 transition-all duration-300 ease-in-out shadow-lg ${
         isExpanded ? "w-[220px] px-5" : "w-[93px] px-6"
       } ${isLoaded ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      style={{ minWidth: isExpanded ? "220px" : "93px" }}
     >
       <SidebarLogo isExpanded={isExpanded} />
       <SidebarNav isExpanded={isExpanded} />
