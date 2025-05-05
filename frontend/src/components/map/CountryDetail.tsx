@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, getCurrencyRate } from "@/lib/api";
 import { ArrowUpRight, ArrowDownRight, ShieldAlert, AlertTriangle, InfoIcon, DollarSign, BarChart4 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 import {
   Sheet,
@@ -33,6 +34,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
   const [conversionRate, setConversionRate] = useState<number>(1);
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
   const [currencyCode, setCurrencyCode] = useState<string>('USD');
+  const navigate = useNavigate();
 
   // Debug logging
   useEffect(() => {
@@ -358,6 +360,44 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                 </div>
               )}
             </div>
+
+            {isAuthenticated ? (
+              <div className="space-y-4">
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Total Medicines</h4>
+                    <p className="text-2xl font-bold">{countryDetails?.total_medicines.toLocaleString()}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Average Price</h4>
+                    <p className="text-2xl font-bold">{countryDetails?.average_price}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Price Inflation</h4>
+                    <p className="text-2xl font-bold">{countryDetails?.price_inflation}%</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => navigate(`/country/${countryId}/stats`)} 
+                  className="w-full"
+                >
+                  View Detailed Statistics
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4 my-6">
+                <Alert variant="destructive">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertTitle>Authentication Required</AlertTitle>
+                  <AlertDescription>
+                    You must be logged in to view country medicine details.
+                  </AlertDescription>
+                </Alert>
+                <Button onClick={openAuthModal} className="w-full">
+                  Log in to access data
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-center h-32">

@@ -70,3 +70,53 @@ CREATE USER IF NOT EXISTS 'worldmeds_user'@'%' IDENTIFIED BY '1234';
 GRANT ALL PRIVILEGES ON worldmeds_db.* TO 'worldmeds_user'@'%';
 
 FLUSH PRIVILEGES;
+
+-- Add mock data for medicine statistics
+INSERT INTO medicines (name, description, price, manufacturer) VALUES
+('Aspirin', 'Pain reliever', 15.99, 'Bayer'),
+('Ibuprofen', 'Anti-inflammatory', 12.50, 'Pfizer'),
+('Paracetamol', 'Fever reducer', 8.99, 'GSK'),
+('Amoxicillin', 'Antibiotic', 25.99, 'Novartis'),
+('Omeprazole', 'Antacid', 18.75, 'AstraZeneca');
+
+-- Add mock data for countries
+INSERT INTO countries (name, continent) VALUES
+('Portugal', 'Europe'),
+('Spain', 'Europe'),
+('Germany', 'Europe'),
+('France', 'Europe'),
+('Italy', 'Europe'),
+('United States', 'North America'),
+('Canada', 'North America'),
+('Brazil', 'South America'),
+('Argentina', 'South America'),
+('Japan', 'Asia'),
+('China', 'Asia'),
+('Australia', 'Oceania');
+
+-- Add mock price history (2020-2023)
+INSERT INTO price_history (medicine_id, country_id, price, date) VALUES
+-- Aspirin price history
+(1, 1, 12.99, '2020-01-01'), (1, 1, 13.99, '2021-01-01'), (1, 1, 14.99, '2022-01-01'), (1, 1, 15.99, '2023-01-01'),
+(1, 2, 13.50, '2020-01-01'), (1, 2, 14.50, '2021-01-01'), (1, 2, 15.50, '2022-01-01'), (1, 2, 16.50, '2023-01-01'),
+-- Ibuprofen price history
+(2, 1, 10.50, '2020-01-01'), (2, 1, 11.00, '2021-01-01'), (2, 1, 11.50, '2022-01-01'), (2, 1, 12.50, '2023-01-01'),
+(2, 2, 11.00, '2020-01-01'), (2, 2, 11.50, '2021-01-01'), (2, 2, 12.00, '2022-01-01'), (2, 2, 13.00, '2023-01-01');
+
+-- Add mock purchase data
+INSERT INTO purchases (medicine_id, country_id, quantity, date) VALUES
+(1, 3, 1000, '2023-01-15'), -- Germany buys a lot of Aspirin
+(1, 4, 800, '2023-01-20'),  -- France
+(2, 3, 1200, '2023-02-01'), -- Germany buys Ibuprofen
+(3, 1, 500, '2023-02-15'),  -- Portugal
+(4, 5, 600, '2023-03-01'),  -- Italy
+(5, 3, 900, '2023-03-15');  -- Germany
+
+-- Add mock continental average prices
+INSERT INTO continental_prices (continent, average_price, date) VALUES
+('Europe', 18.50, '2023-01-01'),
+('North America', 22.75, '2023-01-01'),
+('South America', 15.25, '2023-01-01'),
+('Asia', 16.80, '2023-01-01'),
+('Oceania', 24.30, '2023-01-01'),
+('Africa', 12.90, '2023-01-01');

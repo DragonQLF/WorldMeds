@@ -10,6 +10,11 @@ import Settings from "./pages/Settings";
 import ProfilePage from "./pages/ProfilePage"; // Kept for future use if needed
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { Admin } from "./pages/Admin";
+import { Stats } from "./pages/Stats";
+import { CountryStats } from "@/pages/CountryStats";
+import { CountryProfile } from "@/pages/CountryProfile";
+import { Comparison } from "@/pages/Comparison";
 
 // Create a query client with proper configuration
 const queryClient = new QueryClient({
@@ -42,12 +47,16 @@ const App = () => (
               <Routes>
                 {/* Public routes - accessible without login */}
                 <Route path="/" element={<Index />} />
+                <Route path="/country/:countryId" element={<CountryProfile />} />
                 
                 {/* Protected routes - require authentication */}
                 <Route element={<ProtectedRoute />}>
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/profile" element={<ProfilePage />} />
-                  {/* Add other protected routes here */}
+                  <Route path="/stats" element={<Stats />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/country/:countryId/stats" element={<CountryStats />} />
+                  <Route path="/comparison" element={<Comparison />} />
                 </Route>
                 
                 <Route path="*" element={<Navigate to="/" />} />
