@@ -1,5 +1,5 @@
 # Use Node 20 Alpine as base image
-FROM node:23-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app

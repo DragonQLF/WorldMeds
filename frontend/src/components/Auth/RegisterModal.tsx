@@ -52,11 +52,12 @@ export default function RegisterModal({
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      await register(
-        `${data.first_name} ${data.last_name}`,
-        data.email,
-        data.password
-      );
+      await register({
+        firstName: data.first_name,
+        lastName: data.last_name,
+        email: data.email,
+        password: data.password
+      });
       onOpenChange(false);
       form.reset();
     } catch (error) {

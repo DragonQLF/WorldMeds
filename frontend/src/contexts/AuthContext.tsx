@@ -9,6 +9,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   profilePicture?: string;
+  isAdmin?: boolean;
 }
 
 interface ProfileUpdateData {
