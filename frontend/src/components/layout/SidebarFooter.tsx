@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from "react";
-import { LogIn, LogOut, Moon, Sun, User, Upload, Save, KeyRound, Eye, EyeOff } from "lucide-react";
+import { LogIn, LogOut, Moon, Sun, User, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useMapContext } from "@/contexts/MapContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -12,10 +13,9 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent } from "@/components/ui/card";
 import { useForm } from "react-hook-form";
@@ -49,16 +49,13 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
   const { darkMode, toggleDarkMode } = useMapContext();
-  const { isAuthenticated, user, logout, updateProfile, changePassword, uploadProfilePicture } = useAuth();
+  const { isAuthenticated, user, logout, updateProfile, changePassword } = useAuth();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(user?.profilePicture || null);
-  const [isUploading, setIsUploading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [authModalType, setAuthModalType] = useState<ModalType>(null);
 
   const profileForm = useForm<ProfileFormData>({
@@ -87,7 +84,6 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
         lastName: user.lastName || "",
         email: user.email || "",
       });
-      setProfilePhotoUrl(user.profilePicture || null);
     }
   }, [user, profileForm]);
 
@@ -106,45 +102,6 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
     };
   }, []);
 
-  useEffect(() => {
-    // Update the profile photo URL when the user changes
-    if (user) {
-      // Add cache-busting query parameter to avoid browser caching
-      const cacheBuster = `?t=${Date.now()}`;
-      setProfilePhotoUrl(user.profilePicture ? `${user.profilePicture}${cacheBuster}` : null);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    // Function to check if an image URL is valid
-    const validateImageUrl = async (url: string) => {
-      if (!url) return false;
-      
-      try {
-        // First try a HEAD request to check if the image exists
-        const response = await fetch(url, { method: 'HEAD' });
-        return response.ok;
-      } catch (error) {
-        console.error("Error validating image URL:", error);
-        return false;
-      }
-    };
-    
-    // Validate profile photo URL if it exists
-    const checkProfilePhoto = async () => {
-      if (profilePhotoUrl) {
-        const isValid = await validateImageUrl(profilePhotoUrl);
-        
-        if (!isValid) {
-          console.warn("Profile image not found, falling back to initials");
-          setProfilePhotoUrl(null);
-        }
-      }
-    };
-    
-    checkProfilePhoto();
-  }, [profilePhotoUrl]);
-
   const handleLoginClick = () => {
     setAuthModalType('login');
   };
@@ -157,54 +114,6 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
     const lastInitial = user.lastName?.[0] || "";
     
     return firstInitial + lastInitial || user.email[0].toUpperCase();
-  };
-
-  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    try {
-      setIsUploading(true);
-      
-      // Reset file input value to allow selecting the same file again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      
-      // Upload to server
-      const result = await uploadProfilePicture(file);
-      
-      if (!result.success) {
-        console.error("Failed to upload profile picture:", result.message);
-        toast({
-          title: "Upload failed",
-          description: result.message || "Could not upload profile picture",
-          variant: "destructive"
-        });
-      } else {
-        // Set the profile photo URL with cache busting
-        const cacheBuster = `?t=${Date.now()}`;
-        const pictureUrl = result.profilePicture.includes('?') 
-          ? result.profilePicture 
-          : `${result.profilePicture}${cacheBuster}`;
-          
-        setProfilePhotoUrl(pictureUrl);
-        
-        toast({
-          title: "Photo uploaded",
-          description: "Your profile photo has been updated"
-        });
-      }
-    } catch (error) {
-      console.error("Error uploading profile picture:", error);
-      toast({
-        title: "Upload failed",
-        description: "Could not upload profile picture",
-        variant: "destructive"
-      });
-    } finally {
-      setIsUploading(false);
-    }
   };
 
   const onProfileSubmit = async (data: ProfileFormData) => {
@@ -265,13 +174,9 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
           <SheetTrigger asChild>
             <button className="flex items-center gap-3 cursor-pointer p-3 rounded-lg w-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-gray-500 dark:text-gray-400">
               <Avatar className="h-6 w-6">
-                {profilePhotoUrl ? (
-                  <AvatarImage src={profilePhotoUrl} alt={user?.firstName || "User"} />
-                ) : (
-                  <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                    {getInitials()}
-                  </AvatarFallback>
-                )}
+                <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                  {getInitials()}
+                </AvatarFallback>
               </Avatar>
               {isExpanded && (
                 <span className="dark:text-gray-300 truncate">
@@ -305,36 +210,11 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
               
               <TabsContent value="profile" className="space-y-6">
                 <div className="flex flex-col items-center justify-center mb-6">
-                  <div className="relative">
-                    <Avatar className="h-24 w-24 mb-2">
-                      {profilePhotoUrl ? (
-                        <AvatarImage src={profilePhotoUrl} alt={user?.firstName || "User"} />
-                      ) : (
-                        <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                          {getInitials()}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="absolute -right-2 -bottom-2">
-                      <Label htmlFor="avatar-upload" className="cursor-pointer">
-                        <div className="h-8 w-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
-                          <Upload className={`h-4 w-4 ${isUploading ? 'animate-spin' : ''}`} />
-                        </div>
-                      </Label>
-                      <Input 
-                        id="avatar-upload" 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handlePhotoUpload} 
-                        className="hidden"
-                        ref={fileInputRef}
-                        disabled={isUploading}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {isUploading ? "Uploading..." : "Click to upload a new photo"}
-                  </p>
+                  <Avatar className="h-24 w-24 mb-2">
+                    <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
+                      {getInitials()}
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
                 
                 <Card>
@@ -385,12 +265,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
                         />
                         
                         <Button type="submit" className="w-full" disabled={isSubmitting}>
-                          {isSubmitting ? "Saving..." : (
-                            <>
-                              <Save className="mr-2 h-4 w-4" />
-                              Save Changes
-                            </>
-                          )}
+                          {isSubmitting ? "Saving..." : "Save Changes"}
                         </Button>
                       </form>
                     </Form>
@@ -414,7 +289,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
                                   <Input 
                                     type={showCurrentPassword ? "text" : "password"} 
                                     placeholder="••••••••" 
-                                    autocomplete="current-password"
+                                    autoComplete="current-password"
                                     {...field} 
                                   />
                                   <button
@@ -442,7 +317,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
                                   <Input 
                                     type={showNewPassword ? "text" : "password"} 
                                     placeholder="••••••••" 
-                                    autocomplete="new-password"
+                                    autoComplete="new-password"
                                     {...field} 
                                   />
                                   <button
@@ -470,7 +345,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
                                   <Input 
                                     type={showConfirmPassword ? "text" : "password"} 
                                     placeholder="••••••••" 
-                                    autocomplete="new-password"
+                                    autoComplete="new-password"
                                     {...field} 
                                   />
                                   <button

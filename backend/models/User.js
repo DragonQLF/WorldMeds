@@ -16,6 +16,8 @@ class User {
         // Format the user object to match our expected format
         const user = {
           id: results[0].id,
+          first_name: results[0].first_name,
+          last_name: results[0].last_name,
           firstName: results[0].first_name,
           lastName: results[0].last_name,
           email: results[0].email
@@ -53,7 +55,7 @@ class User {
         const query = 'INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)';
         db.query(
           query,
-          [userData.firstName, userData.lastName, userData.email, hashedPassword],
+          [userData.first_name, userData.last_name, userData.email, hashedPassword],
           (err, result) => {
             if (err) return reject(err);
             
@@ -147,4 +149,4 @@ class User {
   }
 }
 
-module.exports = User; 
+module.exports = User;

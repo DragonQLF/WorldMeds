@@ -30,6 +30,8 @@ app.use(express.json());
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 
+// Public API endpoints - No authentication required
+
 // ✅ Get global average medicine price - Moving this before user routes so it doesn't require auth
 app.get("/api/global-average-medicine-price", (req, res) => {
   let sql = `
@@ -76,66 +78,55 @@ app.get("/api/global-average-medicine-price", (req, res) => {
   });
 });
 
-// New Endpoint: Get average prices for all countries - Moving this before user routes so it doesn't require auth
+// New Endpoint: Get average prices for all countries with trend data
 app.get("/api/countries-average-prices", (req, res) => {
   let sql = `
     SELECT 
       p.id AS countryId,
       p.nome AS countryName,
+      p.moeda AS currency,
       (
         SELECT AVG(sub.avg_price)
         FROM (
           SELECT AVG(mp.preco_venda) AS avg_price
           FROM medicamentos_paises mp
           WHERE mp.pais_id = p.id
-  `;
-  
-  const params = [];
-  
-  if (req.query.date) {
-    sql += ` AND DATE(mp.mes) = ?`;
-    params.push(req.query.date);
-  } else if (req.query.start) {
-    sql += ` AND DATE(mp.mes) >= ?`;
-    params.push(req.query.start);
-    
-    if (req.query.end) {
-      sql += ` AND DATE(mp.mes) <= ?`;
-      params.push(req.query.end);
-    }
-  }
-  
-  sql += `
+          AND DATE_FORMAT(mp.mes, '%Y-%m') = DATE_FORMAT(
+            (SELECT MAX(mes) FROM medicamentos_paises WHERE pais_id = p.id),
+            '%Y-%m'
+          )
           GROUP BY mp.medicamento_id
           ORDER BY SUM(mp.quantidade_comprada) DESC
           LIMIT 5
         ) AS sub
       ) AS averagePrice,
       (
-        SELECT SUM(mp2.quantidade_comprada)
+        SELECT AVG(sub.avg_price)
+        FROM (
+          SELECT AVG(mp.preco_venda) AS avg_price
+          FROM medicamentos_paises mp
+          WHERE mp.pais_id = p.id
+          AND DATE_FORMAT(mp.mes, '%Y-%m') = DATE_FORMAT(
+            DATE_SUB(
+              (SELECT MAX(mes) FROM medicamentos_paises WHERE pais_id = p.id), 
+              INTERVAL 1 MONTH
+            ),
+            '%Y-%m'
+          )
+          GROUP BY mp.medicamento_id
+          ORDER BY SUM(mp.quantidade_comprada) DESC
+          LIMIT 5
+        ) AS sub
+      ) AS previousPrice,
+      (
+        SELECT COUNT(DISTINCT mp2.medicamento_id)
         FROM medicamentos_paises mp2
         WHERE mp2.pais_id = p.id
-  `;
-  
-  if (req.query.date) {
-    sql += ` AND DATE(mp2.mes) = ?`;
-    params.push(req.query.date);
-  } else if (req.query.start) {
-    sql += ` AND DATE(mp2.mes) >= ?`;
-    params.push(req.query.start);
-    
-    if (req.query.end) {
-      sql += ` AND DATE(mp2.mes) <= ?`;
-      params.push(req.query.end);
-    }
-  }
-  
-  sql += `
       ) AS totalMedicines
     FROM paises p;
   `;
   
-  db.query(sql, params, (err, results) => {
+  db.query(sql, (err, results) => {
     if (err) {
       console.error("Error fetching countries averages:", err);
       return res.status(500).json({ error: "Database error" });
@@ -150,9 +141,43 @@ app.use('/api', authRoutes);
 // Use user routes
 app.use('/api', userRoutes);
 
-// ✅ Get all countries
+// ✅ Get all countries with price trend data
 app.get("/api/countries", (req, res) => {
-  const sql = "SELECT id, nome AS name, moeda AS currency FROM paises";
+  const sql = `
+    SELECT 
+      p.id, 
+      p.nome AS name, 
+      p.moeda AS currency,
+      (
+        SELECT AVG(mp.preco_venda)
+        FROM medicamentos_paises mp
+        WHERE mp.pais_id = p.id
+        AND DATE_FORMAT(mp.mes, '%Y-%m') = DATE_FORMAT(
+          (SELECT MAX(mes) FROM medicamentos_paises WHERE pais_id = p.id),
+          '%Y-%m'
+        )
+      ) AS averagePrice,
+      (
+        SELECT AVG(mp.preco_venda)
+        FROM medicamentos_paises mp
+        WHERE mp.pais_id = p.id
+        AND DATE_FORMAT(mp.mes, '%Y-%m') = DATE_FORMAT(
+          DATE_SUB(
+            (SELECT MAX(mes) FROM medicamentos_paises WHERE pais_id = p.id), 
+            INTERVAL 1 MONTH
+          ),
+          '%Y-%m'
+        )
+      ) AS previousPrice,
+      (
+        SELECT COUNT(DISTINCT mp.medicamento_id)
+        FROM medicamentos_paises mp
+        WHERE mp.pais_id = p.id
+      ) AS countryCount
+    FROM paises p
+    ORDER BY p.nome
+  `;
+  
   db.query(sql, (err, results) => {
     if (err) {
       console.error("Error fetching countries:", err);

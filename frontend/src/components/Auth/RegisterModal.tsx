@@ -16,6 +16,7 @@ interface RegisterModalProps {
   onLoginClick: () => void;
 }
 
+// Simplified schema with only the required fields
 const registerSchema = z.object({
   first_name: z.string().min(2, "First name must be at least 2 characters"),
   last_name: z.string().min(2, "Last name must be at least 2 characters"),
@@ -36,8 +37,14 @@ export default function RegisterModal({
 }: RegisterModalProps) {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const { register, isLoading } = useAuth();
+  const { register, isLoading, isAuthenticated } = useAuth();
   const { darkMode } = useMapContext();
+
+  React.useEffect(() => {
+    if (isAuthenticated && isOpen) {
+      onOpenChange(false);
+    }
+  }, [isAuthenticated, isOpen, onOpenChange]);
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -52,14 +59,18 @@ export default function RegisterModal({
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      await register({
+      // Send camelCase keys to match AuthContext register function
+      const result = await register({
         firstName: data.first_name,
         lastName: data.last_name,
         email: data.email,
         password: data.password
       });
-      onOpenChange(false);
-      form.reset();
+      
+      if (result && result.success) {
+        onOpenChange(false);
+        form.reset();
+      }
     } catch (error) {
       console.error("Registration error:", error);
     }
@@ -221,4 +232,4 @@ export default function RegisterModal({
       </DialogContent>
     </Dialog>
   );
-} 
+}

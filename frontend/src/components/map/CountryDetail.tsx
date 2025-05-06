@@ -30,7 +30,7 @@ interface CountryDetailProps {
 
 export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose }) => {
   const { isAuthenticated } = useAuth();
-  const [showLocalCurrency, setShowLocalCurrency] = useState(false);
+  const [showLocalCurrency, setShowLocalCurrency] = useState(true); // Default to local currency
   const [conversionRate, setConversionRate] = useState<number>(1);
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
   const [currencyCode, setCurrencyCode] = useState<string>('USD');
@@ -165,9 +165,9 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
     
     const numericPrice = typeof price === 'number' ? price : parseFloat(String(price));
     
-    // Convert to local currency if needed
+    // Convert to USD if toggled, otherwise show in local currency
     const finalPrice = convertCurrency && !showLocalCurrency
-      ? numericPrice * conversionRate
+      ? numericPrice / conversionRate  // Convert local to USD
       : numericPrice;
     
     return finalPrice.toFixed(2);
@@ -220,13 +220,13 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                 <div className="flex-1">
                   <Label htmlFor="currency-toggle" className="flex items-center space-x-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>Switch to {showLocalCurrency ? 'USD' : currencyCode}</span>
+                    <span>Show in {showLocalCurrency ? 'USD' : currencyCode}</span>
                   </Label>
                 </div>
                 <Switch
                   id="currency-toggle"
-                  checked={showLocalCurrency}
-                  onCheckedChange={(checked) => setShowLocalCurrency(checked)}
+                  checked={!showLocalCurrency}
+                  onCheckedChange={(checked) => setShowLocalCurrency(!checked)}
                 />
               </div>
             )}
@@ -245,7 +245,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                 <div className="flex flex-col">
                   <span className="text-sm text-muted-foreground">Average Price</span>
                   <div className="font-medium flex items-center">
-                    {!showLocalCurrency ? currencySymbol : '$'}
+                    {showLocalCurrency ? currencySymbol : '$'}
                     {formatPrice(countryDetails.avg_price, true)}
                     {countryDetails.previous_price && (
                       countryDetails.avg_price > countryDetails.previous_price ? (
@@ -303,7 +303,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                       <div className="flex justify-between items-center">
                         <span className="font-medium">{medicine.name}</span>
                         <div className="flex items-center">
-                          <span>{!showLocalCurrency ? currencySymbol : '$'}{formatPrice(medicine.averagePrice, true)}</span>
+                          <span>{showLocalCurrency ? currencySymbol : '$'}{formatPrice(medicine.averagePrice, true)}</span>
                           
                           {medicine.previousPrice && (
                             medicine.averagePrice > medicine.previousPrice ? (
@@ -361,42 +361,13 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
               )}
             </div>
 
-            {isAuthenticated ? (
-              <div className="space-y-4">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Total Medicines</h4>
-                    <p className="text-2xl font-bold">{countryDetails?.total_medicines.toLocaleString()}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Average Price</h4>
-                    <p className="text-2xl font-bold">{countryDetails?.average_price}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Price Inflation</h4>
-                    <p className="text-2xl font-bold">{countryDetails?.price_inflation}%</p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={() => navigate(`/country/${countryId}/stats`)} 
-                  className="w-full"
-                >
-                  View Detailed Statistics
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4 my-6">
-                <Alert variant="destructive">
-                  <ShieldAlert className="h-4 w-4" />
-                  <AlertTitle>Authentication Required</AlertTitle>
-                  <AlertDescription>
-                    You must be logged in to view country medicine details.
-                  </AlertDescription>
-                </Alert>
-                <Button onClick={openAuthModal} className="w-full">
-                  Log in to access data
-                </Button>
-              </div>
+            {isAuthenticated && (
+              <Button 
+                onClick={() => navigate(`/country/${countryId}/stats`)} 
+                className="w-full"
+              >
+                View Detailed Statistics
+              </Button>
             )}
           </div>
         ) : (

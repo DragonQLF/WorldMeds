@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { auth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
@@ -8,7 +9,6 @@ interface User {
   email: string;
   firstName?: string;
   lastName?: string;
-  profilePicture?: string;
   isAdmin?: boolean;
 }
 
@@ -16,7 +16,6 @@ interface ProfileUpdateData {
   firstName?: string;
   lastName?: string;
   email?: string;
-  profilePicture?: string | File;
 }
 
 interface PasswordChangeData {
@@ -33,7 +32,6 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<boolean>;
   updateProfile: (data: ProfileUpdateData) => Promise<boolean>;
   changePassword: (data: PasswordChangeData) => Promise<boolean>;
-  uploadProfilePicture: (file: File) => Promise<string | null>;
 }
 
 interface RegisterData {
@@ -70,12 +68,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Make a request to get the profile to verify the token
             const profileResponse = await api.get("/profile");
             
-            // If the profile has a profile picture, check if it exists
-            if (profileResponse.data?.user?.profilePicture) {
+            if (profileResponse.data?.user) {
               // Set the user with verified data from the server
               setUser(profileResponse.data.user);
             } else {
-              // If no profile picture, just set the user
+              // If no profile data, just set the stored user
               setUser(storedUser);
             }
           } catch (error) {
@@ -131,7 +128,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (data: RegisterData): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const response = await auth.register(data);
+      // Ensure we're using the correct field names for the backend
+      const registerData = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        first_name: data.firstName,  // Include both formats
+        last_name: data.lastName,    // Include both formats
+        email: data.email,
+        password: data.password
+      };
+      
+      const response = await auth.register(registerData);
       
       if (response.success) {
         setUser(response.user);
@@ -234,43 +241,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const uploadProfilePicture = async (file: File): Promise<string | null> => {
-    try {
-      setIsLoading(true);
-      const response = await auth.uploadProfilePicture(file);
-      
-      if (response.success) {
-        // Update local user state with new profile picture
-        setUser(prevUser => prevUser ? { 
-          ...prevUser, 
-          profilePicture: response.profilePicture 
-        } : null);
-        
-        toast({
-          title: "Photo uploaded",
-          description: "Your profile photo has been updated",
-        });
-        return response.profilePicture;
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Upload failed",
-          description: response.message || "Could not upload profile picture",
-        });
-        return null;
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Upload error",
-        description: "An unexpected error occurred",
-      });
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const logout = () => {
     auth.logout();
     setUser(null);
@@ -291,7 +261,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         updateProfile,
         changePassword,
-        uploadProfilePicture,
       }}
     >
       {children}

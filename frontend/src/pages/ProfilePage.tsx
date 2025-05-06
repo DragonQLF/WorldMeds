@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +22,7 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, updateProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -60,14 +61,14 @@ export default function ProfilePage() {
     setIsLoading(true);
     
     try {
-      // Here you would typically call an API to update the user profile
-      // For now we'll just simulate a successful update
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const success = await updateProfile(data);
       
-      toast({
-        title: "Profile updated",
-        description: "Your profile information has been updated successfully",
-      });
+      if (success) {
+        toast({
+          title: "Profile updated",
+          description: "Your profile information has been updated successfully",
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -111,7 +112,7 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your account details and personal information.</CardDescription>
+            <CardDescription>Update your account details.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -176,4 +177,4 @@ export default function ProfilePage() {
       </div>
     </div>
   );
-} 
+}
