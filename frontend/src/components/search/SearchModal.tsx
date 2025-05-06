@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from "react";
-import { Search, X } from "lucide-react";
+import { Search, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -14,20 +15,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMapContext } from "@/contexts/MapContext";
 import { api } from "@/lib/api";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import CountryTrendIndicator from "../map/CountryTrendIndicator";
 
 interface SearchResult {
   id: number;
   name: string;
   dosage?: string;
   averagePrice?: number;
+  previousPrice?: number; 
   totalMedicines?: number;
   currency?: string;
   countryCount?: number;
@@ -106,6 +101,27 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
     if (typeof price !== 'number' || isNaN(price)) return 'N/A';
     return `$${price.toFixed(2)}`;
   };
+
+  // Function to get the flag URL
+  const getCountryFlag = (countryName: string) => {
+    const countryFlags: Record<string, string> = {
+      "Argentina": "ar",
+      "Australia": "au",
+      "Brazil": "br",
+      "Canada": "ca",
+      "Chile": "cl",
+      "Mexico": "mx",
+      "Russia": "ru",
+      "USA": "us",
+      "South Korea": "kr",
+      "India": "in",
+      "Algeria": "dz",
+      "Angola": "ao"
+    };
+    
+    const code = countryFlags[countryName] || "un";
+    return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
+  };
   
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -119,69 +135,94 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
           {type === "country" ? "Search Countries" : "Search Medicines"}
         </Button>
       </DialogTrigger>
-      <DialogContent className={`sm:max-w-2xl ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'}`}>
+      <DialogContent 
+        className={`sm:max-w-md ${darkMode ? 'bg-gray-900 text-white border-gray-700' : 'bg-white'}`}
+        style={{ maxWidth: "400px" }}
+      >
         <DialogHeader>
-          <DialogTitle>{type === "country" ? "Countries" : "Medicines"}</DialogTitle>
+          <DialogTitle className="text-xl">{type === "country" ? "Countries" : "Medicines"}</DialogTitle>
           <DialogDescription className={darkMode ? 'text-gray-300' : 'text-gray-500'}>
             {searchTerm.length >= 2 ? `Search results for "${searchTerm}"` : "All available items"}
           </DialogDescription>
         </DialogHeader>
+        
         <div className="py-4">
           <Input 
-            placeholder={`Search ${type === "country" ? "countries" : "medicines"}...`}
+            placeholder={`Search Any ${type === "country" ? "Country" : "Medicine"}...`}
             onChange={handleInputChange}
-            className={`mb-4 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white'}`}
+            className={`mb-4 ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'}`}
             autoFocus
             aria-label={`Search ${type}`}
             value={searchTerm}
           />
           
-          <div className={`max-h-[50vh] overflow-y-auto ${darkMode ? 'scrollbar-dark' : 'scrollbar-light'}`}>
+          <div className={`max-h-[60vh] overflow-y-auto ${darkMode ? 'scrollbar-dark' : 'scrollbar-light'}`}>
             {isLoading ? (
               <p className="text-center py-4">Loading...</p>
             ) : displayItems.length === 0 ? (
               <p className="text-center py-4">No items found</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    {type === "medicine" && <TableHead>Dosage</TableHead>}
-                    {type === "country" && <TableHead>Currency</TableHead>}
-                    <TableHead>{type === "country" ? "Medicines" : "Countries"}</TableHead>
-                    <TableHead>Avg. Price</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {displayItems.map((item: SearchResult) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      {type === "medicine" && <TableCell>{item.dosage || 'N/A'}</TableCell>}
-                      {type === "country" && <TableCell>{item.currency || 'N/A'}</TableCell>}
-                      <TableCell>
-                        {type === "country" 
-                          ? (item.totalMedicines !== undefined ? item.totalMedicines : 'N/A') 
-                          : (item.countryCount !== undefined ? item.countryCount : 'N/A')}
-                      </TableCell>
-                      <TableCell>{item.averagePrice !== undefined ? formatPrice(item.averagePrice) : 'N/A'}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSelect(item)}
-                        >
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <ul className="space-y-2">
+                {displayItems.map((item: SearchResult) => (
+                  <li 
+                    key={item.id}
+                    className={`px-4 py-3 rounded-md flex items-center justify-between ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      {type === "country" && (
+                        <div className="w-10 h-6 overflow-hidden rounded">
+                          <img 
+                            src={getCountryFlag(item.name)} 
+                            alt={`${item.name} flag`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      
+                      <div>
+                        <p className="font-medium">{item.name}</p>
+                        <div className="flex items-center mt-1 text-sm">
+                          {item.averagePrice !== undefined ? (
+                            <>
+                              <CountryTrendIndicator
+                                currentPrice={item.averagePrice}
+                                previousPrice={item.previousPrice}
+                                className="mr-2"
+                                showValue={false}
+                              />
+                              <span className="font-medium">${Number(item.averagePrice).toFixed(2)}</span>
+                              {item.totalMedicines !== undefined && (
+                                <span className="ml-3 flex items-center text-gray-500">
+                                  • <svg className="h-3 w-3 mx-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                                    </svg> {item.totalMedicines.toLocaleString()}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-500">No price data</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className={`w-12 h-6 rounded-full ${
+                        item.averagePrice !== undefined && item.previousPrice !== undefined && 
+                        item.averagePrice < item.previousPrice 
+                          ? 'bg-green-400' 
+                          : 'bg-gray-300'
+                      } relative`}>
+                        <div className={`absolute inset-y-1 right-1 w-4 h-4 rounded-full bg-white`}></div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
   );
-};
+}

@@ -1,81 +1,37 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/icone.png" id="favicon" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffffff" />
-    <title>WorldMeds</title>
-    <meta name="description" content="WorldMeds" />
-    <meta name="author" content="WorldMeds" />
-    <link rel="icon" href="/icone.png" type="image/png" id="favicon-light" />
-    <link rel="icon" href="/icone-dark.png" type="image/png" id="favicon-dark" disabled />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>WorldMeds - Global Medicine Price Comparison</title>
+    <meta name="description" content="Compare medicine prices across countries and analyze inflation trends in the pharmaceutical sector." />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // Handle favicon changes based on theme
-      const lightSchemeIcon = document.querySelector('link#favicon-light');
-      const darkSchemeIcon = document.querySelector('link#favicon-dark');
+      // Check if the user prefers dark mode
+      const darkModePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const storedTheme = localStorage.getItem('worldmeds-theme');
+      const userTheme = storedTheme ? storedTheme : (darkModePreferred ? 'dark' : 'light');
       
-      function onUpdate() {
-        if (matcher.matches) {
-          lightSchemeIcon.remove();
-          document.head.append(darkSchemeIcon);
-        } else {
-          darkSchemeIcon.remove();
-          document.head.append(lightSchemeIcon);
-        }
+      // Set the favicon based on theme
+      const favicon = document.getElementById('favicon');
+      if (favicon) {
+        favicon.href = userTheme === 'dark' ? '/icone-dark.png' : '/icone.png';
       }
       
-      const matcher = window.matchMedia('(prefers-color-scheme: dark)');
-      matcher.addListener(onUpdate);
-      onUpdate();
-      
-      // Also listen for class changes to support manual theme toggling
-      const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-          if (mutation.attributeName === "class") {
-            const isDarkMode = document.documentElement.classList.contains('dark');
-            if (isDarkMode) {
-              lightSchemeIcon.remove();
-              document.head.append(darkSchemeIcon);
-            } else {
-              darkSchemeIcon.remove();
-              document.head.append(lightSchemeIcon);
-            }
+      // Listen for changes to theme
+      window.addEventListener('storage', function(e) {
+        if (e.key === 'worldmeds-theme') {
+          const newTheme = e.newValue || 'light';
+          const favicon = document.getElementById('favicon');
+          if (favicon) {
+            favicon.href = newTheme === 'dark' ? '/icone-dark.png' : '/icone.png';
           }
-        });
-      });
-      
-      document.addEventListener('DOMContentLoaded', function() {
-        observer.observe(document.documentElement, { attributes: true });
-        
-        // Add support for passive event listeners to improve scrolling performance
-        // This will prevent the console warnings for non-passive event listeners
-        const supportsPassive = false;
-        try {
-          const opts = Object.defineProperty({}, 'passive', {
-            get: function() {
-              supportsPassive = true;
-              return true;
-            }
-          });
-          window.addEventListener("testPassive", null, opts);
-          window.removeEventListener("testPassive", null, opts);
-        } catch (e) {}
-
-        if (supportsPassive) {
-          const wheelOpts = supportsPassive ? { passive: true } : false;
-          const wheelEvents = ['wheel', 'mousewheel', 'touchstart', 'touchmove'];
-          
-          wheelEvents.forEach(function(eventName) {
-            document.addEventListener(eventName, function() {}, wheelOpts);
-          });
         }
       });
     </script>
   </head>
-
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

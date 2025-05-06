@@ -41,22 +41,6 @@ app.post("/api/login", (req, res) => {
   });
 });
 
-// SIGN UP
-app.post("/api/signup", async (req, res) => {
-  const { first_name, last_name, email, password } = req.body;
-
-  const hash = await bcrypt.hash(password, 10);
-
-  db.query(
-    "INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)",
-    [first_name, last_name, email, hash, 'user'],
-    (err, result) => {
-      if (err) return res.status(500).json({ success: false, message: "Erro ao criar conta" });
-      res.json({ success: true, id: result.insertId });
-    }
-  );
-});
-
 // Healthcheck
 app.get("/api/health", (req, res) => res.send("OK"));
 

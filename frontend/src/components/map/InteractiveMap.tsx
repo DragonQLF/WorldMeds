@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   ComposableMap,
@@ -15,12 +16,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
 interface CountryData {
-  countryId: string;
+  countryId: string | number;
   countryName: string;
-  countryCode: string;
   averagePrice: number;
-  totalMedicines: number;
   previousPrice?: number;
+  totalMedicines: number;
 }
 
 interface MedicineData {
@@ -31,45 +31,10 @@ interface MedicineData {
 }
 
 interface InteractiveMapProps {
-  onCountryClick?: (country: { id: string; name: string; averagePrice: number; totalMedicines: number }) => void;
+  onCountryClick?: (country: { id: string | number; name: string; averagePrice: number; totalMedicines: number }) => void;
 }
 
 const geoUrl = "/features.json";
-
-// ISO country codes mapping
-const countryCodeMap: Record<string, string> = {
-  "United States": "us",
-  "Canada": "ca",
-  "Brazil": "br",
-  "Mexico": "mx",
-  "Australia": "au",
-  "Germany": "de",
-  "United Kingdom": "gb",
-  "France": "fr",
-  "Spain": "es",
-  "Italy": "it",
-  "Russia": "ru",
-  "China": "cn",
-  "India": "in",
-  "Japan": "jp",
-  "South Africa": "za",
-  "Argentina": "ar",
-  "Egypt": "eg",
-  "Saudi Arabia": "sa",
-  "Nigeria": "ng",
-  "Kenya": "ke",
-  "Sweden": "se",
-  "Norway": "no",
-  "Finland": "fi",
-  "Denmark": "dk",
-  "Netherlands": "nl",
-  "Belgium": "be",
-  "Switzerland": "ch",
-  "Austria": "at",
-  "Poland": "pl",
-  "Turkey": "tr",
-  // Add more as needed
-};
 
 const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
   const { visualizationType, darkMode, selectedDate, dateRange } = useMapContext();
@@ -81,13 +46,12 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
   const [globalAverage, setGlobalAverage] = useState<number>(0);
   const [countriesData, setCountriesData] = useState<CountryData[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<{
-    id: string;
+    id: string | number;
     name: string;
-    code: string;
     coordinates: [number, number];
     medicines: MedicineData[];
   } | null>(null);
-  const [detailCountryId, setDetailCountryId] = useState<string | null>(null);
+  const [detailCountryId, setDetailCountryId] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Performance optimization refs
@@ -134,10 +98,10 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
 
       try {
         const countriesRes = await api.get(`/countries-average-prices${dateParam}`);
-        // Add country codes to the data
+        // Add country information to the data
         countriesDataValue = countriesRes.data.map((country: any) => ({
           ...country,
-          countryCode: countryCodeMap[country.countryName] || 'un' // Default to UN flag if code not found
+          // No more need for countryCode
         }));
       } catch (error) {
         console.warn("Could not fetch countries data, using default value", error);
@@ -339,7 +303,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
               <CountryMarker 
                 coordinates={selectedCountry.coordinates}
                 countryName={selectedCountry.name}
-                countryCode={selectedCountry.code}
+                countryCode=""  // No longer using country code
                 averagePrice={countriesData.find(c => c.countryId === selectedCountry.id)?.averagePrice || 0}
                 globalAverage={globalAverage}
                 totalMedicines={countriesData.find(c => c.countryId === selectedCountry.id)?.totalMedicines || 0}

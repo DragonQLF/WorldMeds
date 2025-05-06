@@ -1,3 +1,4 @@
+
 import axios from "axios";
 
 // Local utility function to avoid circular dependency with auth.ts
@@ -22,9 +23,7 @@ const protectedEndpoints = [
 
 // Define endpoints that require authentication but shouldn't auto-redirect on 401
 const apiEndpointsWithAuth = [
-  // Removing these endpoints as they should work without authentication
-  // '/global-average-medicine-price',
-  // '/countries-average-prices'
+  // No endpoints here - all endpoints should be accessible without authentication
 ];
 
 // Check if a URL path is for a protected endpoint
@@ -100,7 +99,7 @@ export const getCurrencyRate = async (fromCurrency: string, toCurrency: string =
   
   try {
     // Using Open Exchange Rates API (you need to replace with your actual API)
-    // Free alternative: https://openexchangerates.org/ (requires registration)
+    // Free alternative: https://open.er-api.com/v6/latest/${fromCurrency}
     const response = await axios.get(`https://open.er-api.com/v6/latest/${fromCurrency}`);
     
     if (response.data && response.data.rates && response.data.rates[toCurrency]) {
@@ -122,4 +121,28 @@ export const getCurrencyRate = async (fromCurrency: string, toCurrency: string =
     // For important apps, you might want to throw an error instead
     return 1;
   }
+};
+
+// Helper function to compare prices and detect trends
+export const getPriceTrend = (currentPrice: number, previousPrice: number): 'up' | 'down' | 'neutral' => {
+  if (!currentPrice || !previousPrice || isNaN(currentPrice) || isNaN(previousPrice)) {
+    return 'neutral';
+  }
+  
+  if (currentPrice > previousPrice) {
+    return 'up';
+  } else if (currentPrice < previousPrice) {
+    return 'down';
+  } else {
+    return 'neutral';
+  }
+};
+
+// Helper function to calculate price change percentage
+export const getPriceChangePercentage = (currentPrice: number, previousPrice: number): number => {
+  if (!currentPrice || !previousPrice || isNaN(currentPrice) || isNaN(previousPrice) || previousPrice === 0) {
+    return 0;
+  }
+  
+  return ((currentPrice - previousPrice) / previousPrice) * 100;
 };

@@ -5,6 +5,8 @@ const { generateToken } = require('../middleware/auth');
 // User registration
 exports.register = async (req, res) => {
   try {
+    console.log("Register endpoint received body:", req.body);  // Added logging
+
     // Support both formats of field names
     const { first_name, last_name, firstName, lastName, email, password } = req.body;
     
@@ -14,6 +16,7 @@ exports.register = async (req, res) => {
     
     // Validate required fields
     if (!userFirstName || !userLastName || !email || !password) {
+      console.log("Validation failed: Missing required fields", { userFirstName, userLastName, email, password });  // Added logging
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -46,12 +49,12 @@ exports.register = async (req, res) => {
       message: 'User registered successfully',
       user: {
         id: user.id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        firstName: user.first_name, // Include both formats for compatibility
-        lastName: user.last_name,
+        first_name: userFirstName,
+        last_name: userLastName,
+        firstName: userFirstName, // Include both formats for compatibility
+        lastName: userLastName,
         email: user.email,
-        role: user.role
+        role: user.role || 'user'
       },
       token
     });
@@ -153,4 +156,4 @@ exports.forgotPassword = async (req, res) => {
       message: 'An error occurred'
     });
   }
-}; 
+};
