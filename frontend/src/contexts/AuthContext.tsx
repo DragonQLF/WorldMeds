@@ -1,8 +1,8 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { auth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { connectWebSocket, disconnectWebSocket, startPingInterval, stopPingInterval } from "@/services/websocketService";
 
 interface User {
   id: string;
@@ -10,6 +10,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   isAdmin?: boolean;
+  role?: string;
 }
 
 interface ProfileUpdateData {
@@ -32,6 +33,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<boolean>;
   updateProfile: (data: ProfileUpdateData) => Promise<boolean>;
   changePassword: (data: PasswordChangeData) => Promise<boolean>;
+  refreshUserData: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -55,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check for existing auth on mount
+  // Check for existing auth on mount and manage WebSocket connection
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -70,27 +72,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (profileResponse.data?.user) {
               // Set the user with verified data from the server
-              setUser(profileResponse.data.user);
+              const userData = {
+                ...profileResponse.data.user,
+                // Ensure admin status is correctly set
+                isAdmin: profileResponse.data.user.role === 'admin',
+              };
+              
+              console.log('User authenticated with profile data:', { 
+                id: userData.id, 
+                role: userData.role, 
+                isAdmin: userData.isAdmin 
+              });
+              
+              setUser(userData);
+              
+              // Connect to WebSocket for online status tracking
+              connectWebSocket(token);
+              startPingInterval();
             } else {
-              // If no profile data, just set the stored user
-              setUser(storedUser);
+              // If no profile data, process the stored user
+              const processedUser = {
+                ...storedUser,
+                // Ensure admin status is correctly set
+                isAdmin: storedUser.role === 'admin'
+              };
+              
+              console.log('Using stored user data:', { 
+                id: processedUser.id, 
+                role: processedUser.role, 
+                isAdmin: processedUser.isAdmin 
+              });
+              
+              setUser(processedUser);
+              
+              // Connect to WebSocket for online status tracking
+              connectWebSocket(token);
+              startPingInterval();
             }
           } catch (error) {
+            console.error("Token validation failed:", error);
             // If the token is invalid, clear auth data
-            console.error("Invalid token, clearing auth data");
             auth.logout();
+            disconnectWebSocket();
+            stopPingInterval();
           }
+        } else {
+          console.log('No stored authentication found');
         }
       } catch (error) {
         console.error("Auth check error:", error);
         // Clear potentially corrupt auth data
         auth.logout();
+        disconnectWebSocket();
+        stopPingInterval();
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAuth();
+
+    // Clean up WebSocket connection on unmount
+    return () => {
+      disconnectWebSocket();
+      stopPingInterval();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -100,6 +146,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (response.success) {
         setUser(response.user);
+        
+        // Connect to WebSocket after successful login
+        const token = localStorage.getItem("auth_token");
+        if (token) {
+          connectWebSocket(token);
+        }
+        
         toast({
           title: "Welcome back!",
           description: "Successfully logged in",
@@ -142,6 +195,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (response.success) {
         setUser(response.user);
+        
+        // Connect to WebSocket after successful registration
+        const token = localStorage.getItem("auth_token");
+        if (token) {
+          connectWebSocket(token);
+        }
+        
         toast({
           title: "Account created",
           description: "Your account has been successfully created",
@@ -241,7 +301,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshUserData = async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+      if (token) {
+        const profileResponse = await api.get("/profile");
+        if (profileResponse.data?.user) {
+          const userData = {
+            ...profileResponse.data.user,
+            isAdmin: profileResponse.data.user.role === 'admin',
+          };
+          setUser(userData);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to refresh user data:", error);
+    }
+  };
+
   const logout = () => {
+    // Disconnect WebSocket before logout
+    disconnectWebSocket();
+    stopPingInterval();
+    
     auth.logout();
     setUser(null);
     toast({
@@ -261,6 +343,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         updateProfile,
         changePassword,
+        refreshUserData,
       }}
     >
       {children}

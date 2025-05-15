@@ -1,3 +1,4 @@
+
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -67,7 +68,7 @@ export default function RegisterModal({
         password: data.password
       });
       
-      if (result && result.success) {
+      if (result) {
         onOpenChange(false);
         form.reset();
       }

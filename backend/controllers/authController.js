@@ -83,18 +83,18 @@ exports.login = async (req, res) => {
     // Find user by email
     const user = await User.findByEmail(email);
     if (!user) {
-      return res.status(401).json({
+      return res.status(200).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid email or password'
       });
     }
     
     // Check password
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      return res.status(401).json({
+      return res.status(200).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid email or password'
       });
     }
     
@@ -120,7 +120,7 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({
+    res.status(200).json({
       success: false,
       message: 'An error occurred during login'
     });

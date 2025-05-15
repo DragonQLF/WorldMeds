@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from "react";
-import { XIcon, Moon, Sun, LogIn, User, LogOut, Upload, Save, KeyRound, Eye, EyeOff } from "lucide-react";
+import { XIcon, Moon, Sun, LogIn, User, LogOut, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useSidebar } from "@/hooks/useSidebar";
 import { SidebarLogo } from "./SidebarLogo";
 import { useMapContext } from "@/contexts/MapContext";
@@ -14,7 +15,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,16 +52,13 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   const { navigationItems } = useSidebar();
   const { darkMode, toggleDarkMode } = useMapContext();
-  const { isAuthenticated, user, logout, updateProfile, changePassword, uploadProfilePicture } = useAuth();
+  const { isAuthenticated, user, logout, updateProfile, changePassword } = useAuth();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(user?.profilePicture || null);
-  const [isUploading, setIsUploading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -88,42 +86,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
         lastName: user.lastName || "",
         email: user.email || "",
       });
-      // Add cache-busting query parameter to avoid browser caching
-      const cacheBuster = `?t=${Date.now()}`;
-      setProfilePhotoUrl(user.profilePicture ? `${user.profilePicture}${cacheBuster}` : null);
     }
   }, [user, profileForm]);
-
-  // Add this somewhere at the top level of the component
-  useEffect(() => {
-    // Function to check if an image URL is valid
-    const validateImageUrl = async (url: string) => {
-      if (!url) return false;
-      
-      try {
-        // First try a HEAD request to check if the image exists
-        const response = await fetch(url, { method: 'HEAD' });
-        return response.ok;
-      } catch (error) {
-        console.error("Error validating image URL:", error);
-        return false;
-      }
-    };
-    
-    // Validate profile photo URL if it exists
-    const checkProfilePhoto = async () => {
-      if (profilePhotoUrl) {
-        const isValid = await validateImageUrl(profilePhotoUrl);
-        
-        if (!isValid) {
-          console.warn("Profile image not found, falling back to initials");
-          setProfilePhotoUrl(null);
-        }
-      }
-    };
-    
-    checkProfilePhoto();
-  }, [profilePhotoUrl]);
 
   const handleLoginClick = () => {
     // Dispatch event to open login modal
@@ -142,54 +106,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
     const lastInitial = user.lastName?.[0] || "";
     
     return firstInitial + lastInitial || user.email[0].toUpperCase();
-  };
-
-  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    try {
-      setIsUploading(true);
-      
-      // Reset file input value to allow selecting the same file again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      
-      // Upload to server
-      const result = await uploadProfilePicture(file);
-      
-      if (!result.success) {
-        console.error("Failed to upload profile picture:", result.message);
-        toast({
-          title: "Upload failed",
-          description: result.message || "Could not upload profile picture",
-          variant: "destructive"
-        });
-      } else {
-        // Set the profile photo URL with cache busting
-        const cacheBuster = `?t=${Date.now()}`;
-        const pictureUrl = result.profilePicture.includes('?') 
-          ? result.profilePicture 
-          : `${result.profilePicture}${cacheBuster}`;
-          
-        setProfilePhotoUrl(pictureUrl);
-        
-        toast({
-          title: "Photo uploaded",
-          description: "Your profile photo has been updated"
-        });
-      }
-    } catch (error) {
-      console.error("Error uploading profile picture:", error);
-      toast({
-        variant: "destructive",
-        title: "Upload failed",
-        description: "Could not upload profile picture",
-      });
-    } finally {
-      setIsUploading(false);
-    }
   };
 
   const onProfileSubmit = async (data: ProfileFormData) => {
@@ -237,17 +153,17 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
       <div className="h-full max-w-[85%] w-[300px] bg-background border-r border-border shadow-lg p-6 flex flex-col">
         <div className="flex justify-between items-center mb-8">
-        <SidebarLogo isExpanded={true} />
+          <SidebarLogo isExpanded={true} />
           <button onClick={onClose} className="text-gray-500 dark:text-gray-300">
             <XIcon className="h-6 w-6" />
-        </button>
-      </div>
+          </button>
+        </div>
       
         <nav className="space-y-6 flex-1">
           <ul className="space-y-2">
             {navigationItems.map((item, index) => (
               <li key={index}>
-              <button
+                <button
                   className="flex items-center gap-3 p-3 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground w-full text-left"
                   onClick={() => {
                     navigate(item.href);
@@ -268,13 +184,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
               <SheetTrigger asChild>
                 <button className="flex items-center gap-3 cursor-pointer p-3 rounded-lg w-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-gray-500 dark:text-gray-400">
                   <Avatar className="h-6 w-6">
-                    {profilePhotoUrl ? (
-                      <AvatarImage src={profilePhotoUrl} alt={user?.firstName || "User"} />
-                    ) : (
-                      <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                        {getInitials()}
-                      </AvatarFallback>
-                    )}
+                    <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                      {getInitials()}
+                    </AvatarFallback>
                   </Avatar>
                   <span className="dark:text-gray-300">{user?.firstName || "Profile"}</span>
                 </button>
@@ -306,36 +218,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                   
                   <TabsContent value="profile" className="space-y-6">
                     <div className="flex flex-col items-center justify-center mb-6">
-                      <div className="relative">
-                        <Avatar className="h-24 w-24 mb-2">
-                          {profilePhotoUrl ? (
-                            <AvatarImage src={profilePhotoUrl} alt={user?.firstName || "User"} />
-                          ) : (
-                            <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                              {getInitials()}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div className="absolute -right-2 -bottom-2">
-                          <Label htmlFor="avatar-upload-mobile" className="cursor-pointer">
-                            <div className="h-8 w-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
-                              <Upload className={`h-4 w-4 ${isUploading ? 'animate-spin' : ''}`} />
-                            </div>
-                          </Label>
-                          <Input 
-                            id="avatar-upload-mobile" 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={handlePhotoUpload} 
-                            className="hidden" 
-                            ref={fileInputRef}
-                            disabled={isUploading}
-                          />
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {isUploading ? "Uploading..." : "Click to upload a new photo"}
-                      </p>
+                      <Avatar className="h-24 w-24 mb-2">
+                        <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
+                          {getInitials()}
+                        </AvatarFallback>
+                      </Avatar>
                     </div>
                     
                     <Card>
@@ -383,12 +270,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                             />
                             
                             <Button type="submit" className="w-full" disabled={isSubmitting}>
-                              {isSubmitting ? "Saving..." : (
-                                <>
-                                  <Save className="mr-2 h-4 w-4" />
-                                  Save Changes
-                                </>
-                              )}
+                              {isSubmitting ? "Saving..." : "Save Changes"}
                             </Button>
                           </form>
                         </Form>
@@ -412,7 +294,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                                       <Input 
                                         type={showCurrentPassword ? "text" : "password"} 
                                         placeholder="••••••••" 
-                                        autocomplete="current-password"
+                                        autoComplete="current-password"
                                         {...field} 
                                       />
                                       <button
@@ -440,7 +322,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                                       <Input 
                                         type={showNewPassword ? "text" : "password"} 
                                         placeholder="••••••••" 
-                                        autocomplete="new-password"
+                                        autoComplete="new-password"
                                         {...field} 
                                       />
                                       <button
@@ -468,7 +350,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                                       <Input 
                                         type={showConfirmPassword ? "text" : "password"} 
                                         placeholder="••••••••" 
-                                        autocomplete="new-password"
+                                        autoComplete="new-password"
                                         {...field} 
                                       />
                                       <button
@@ -477,8 +359,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                       >
                                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                  </button>
-        </div>
+                                      </button>
+                                    </div>
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -523,10 +405,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
             >
               <LogIn className="w-6 h-6 text-gray-500 dark:text-gray-300" />
               <span className="dark:text-gray-300">Login</span>
-        </button>
+            </button>
           )}
 
-        <button 
+          <button 
             className="flex items-center gap-3 cursor-pointer p-3 rounded-lg w-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-gray-500 dark:text-gray-300"
             onClick={toggleDarkMode}
           >
@@ -536,7 +418,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
               <Moon className="w-6 h-6 text-gray-500 dark:text-gray-300" />
             )}
             <span className="dark:text-gray-300">{darkMode ? "Light" : "Dark"}</span>
-        </button>
+          </button>
         </div>
       </div>
     </div>

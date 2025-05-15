@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { LogIn, LogOut, Moon, Sun, User, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useMapContext } from "@/contexts/MapContext";
@@ -49,7 +48,7 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
   const { darkMode, toggleDarkMode } = useMapContext();
-  const { isAuthenticated, user, logout, updateProfile, changePassword } = useAuth();
+  const { isAuthenticated, user, logout, updateProfile, changePassword, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -101,6 +100,21 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
       window.removeEventListener('open-auth-modal', handleOpenAuthModal);
     };
   }, []);
+
+  useEffect(() => {
+    const handleUserDataRefreshed = (e: Event) => {
+      // Force a refresh of user data in the Auth context
+      if (refreshProfile) {
+        refreshProfile();
+      }
+    };
+    
+    window.addEventListener('user-data-refreshed', handleUserDataRefreshed);
+    
+    return () => {
+      window.removeEventListener('user-data-refreshed', handleUserDataRefreshed);
+    };
+  }, [refreshProfile]);
 
   const handleLoginClick = () => {
     setAuthModalType('login');

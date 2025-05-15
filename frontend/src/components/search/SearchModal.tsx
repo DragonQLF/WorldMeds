@@ -15,8 +15,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMapContext } from "@/contexts/MapContext";
 import { api } from "@/lib/api";
-import CountryTrendIndicator from "../map/CountryTrendIndicator";
-
 interface SearchResult {
   id: number;
   name: string;
@@ -184,12 +182,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({ type, onSelect }) => {
                         <div className="flex items-center mt-1 text-sm">
                           {item.averagePrice !== undefined ? (
                             <>
-                              <CountryTrendIndicator
-                                currentPrice={item.averagePrice}
-                                previousPrice={item.previousPrice}
-                                className="mr-2"
-                                showValue={false}
-                              />
                               <span className="font-medium">${Number(item.averagePrice).toFixed(2)}</span>
                               {item.totalMedicines !== undefined && (
                                 <span className="ml-3 flex items-center text-gray-500">

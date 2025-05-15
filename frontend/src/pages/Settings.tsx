@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,11 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMapContext } from "@/contexts/MapContext";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, User, Shield, Mail, Moon } from "lucide-react";
+import { Lock, Bell, User, Shield, Mail, Moon, Settings as SettingsIcon } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
+  const { showPricePerPill, setShowPricePerPill } = useMapContext();
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +29,14 @@ export default function Settings() {
     toast({
       title: "Notification settings updated",
       description: "Your notification preferences have been saved.",
+    });
+  };
+
+  const handlePricePerPillChange = (checked: boolean) => {
+    setShowPricePerPill(checked);
+    toast({
+      title: "Display settings updated",
+      description: `Prices will now be shown ${checked ? "per pill" : "per package"}.`,
     });
   };
 
@@ -49,6 +60,10 @@ export default function Settings() {
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
               Notifications
+            </TabsTrigger>
+            <TabsTrigger value="display" className="flex items-center gap-2">
+              <SettingsIcon className="h-4 w-4" />
+              Display
             </TabsTrigger>
           </TabsList>
 
@@ -166,6 +181,31 @@ export default function Settings() {
                     </p>
                   </div>
                   <Switch onCheckedChange={handleNotificationChange} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="display" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Price Display Settings</CardTitle>
+                <CardDescription>
+                  Configure how medicine prices are displayed throughout the application.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Show Price Per Pill</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Toggle between showing prices per package or per individual pill.
+                    </p>
+                  </div>
+                  <Switch 
+                    checked={showPricePerPill}
+                    onCheckedChange={handlePricePerPillChange}
+                  />
                 </div>
               </CardContent>
             </Card>
