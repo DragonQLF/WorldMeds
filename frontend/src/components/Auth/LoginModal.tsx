@@ -1,3 +1,4 @@
+
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +11,7 @@ import { z } from "zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMapContext } from "@/contexts/MapContext";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -32,6 +34,7 @@ export default function LoginModal({
   onForgotPasswordClick 
 }: LoginModalProps) {
   const [showPassword, setShowPassword] = React.useState(false);
+  const [loginError, setLoginError] = React.useState<string | null>(null);
   const { login, isLoading } = useAuth();
   const { darkMode } = useMapContext();
   
@@ -43,11 +46,29 @@ export default function LoginModal({
     },
   });
 
-  const onSubmit = async (data: LoginFormData) => {
-    const success = await login(data.email, data.password);
-    if (success) {
-      onOpenChange(false);
+  // Clear error when modal opens or closes
+  React.useEffect(() => {
+    if (!isOpen) {
       form.reset();
+      setLoginError(null);
+    }
+  }, [isOpen, form]);
+
+  const onSubmit = async (data: LoginFormData) => {
+    setLoginError(null); // Clear any previous errors
+    
+    try {
+      const result = await login(data.email, data.password);
+      
+      if (result) {
+        // Login was successful, modal will be closed by the auth context
+        onOpenChange(false);
+        form.reset();
+      }
+      // The error handling is now done in the AuthContext
+    } catch (error) {
+      console.error("Login error:", error);
+      setLoginError("An unexpected error occurred. Please try again later.");
     }
   };
 
@@ -65,6 +86,13 @@ export default function LoginModal({
             Enter your credentials to access your account
           </DialogDescription>
         </DialogHeader>
+        
+        {/* Display login error if any */}
+        {loginError && (
+          <div className="bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3 mb-4">
+            <p className="text-red-700 dark:text-red-400 text-sm">{loginError}</p>
+          </div>
+        )}
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -163,4 +191,4 @@ export default function LoginModal({
       </DialogContent>
     </Dialog>
   );
-} 
+}

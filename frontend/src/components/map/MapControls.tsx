@@ -1,29 +1,37 @@
-import React, { useState, useEffect } from "react";
-import { Calendar, ZoomIn, ZoomOut, Map, LineChart } from "lucide-react";
+
+import React, { useState, useEffect, useRef, memo } from "react";
+import { Calendar, ZoomIn, ZoomOut, Map, Info } from "lucide-react";
 import { useMapContext } from "@/contexts/MapContext";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import MonthPicker from "@/components/datepicker/MonthPicker";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MapControlsProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
+  onToggleLegend?: () => void;
+  showLegend?: boolean;
 }
 
-export const MapControls: React.FC<MapControlsProps> = ({
+export const MapControls: React.FC<MapControlsProps> = memo(({
   onZoomIn,
   onZoomOut,
+  onToggleLegend,
+  showLegend = true,
 }) => {
   const { 
     visualizationType, 
     setVisualizationType, 
-    selectedDate,
-    setSelectedDate,
-    darkMode
+    selectedMonth,
+    setSelectedMonth,
+    showMonthPicker, 
+    setShowMonthPicker
   } = useMapContext();
   
   const [isVisible, setIsVisible] = useState(false);
+  const calendarButtonRef = useRef<HTMLButtonElement>(null);
+  const isMobile = useIsMobile();
   
   // Animation to fade in controls
   useEffect(() => {
@@ -34,42 +42,40 @@ export const MapControls: React.FC<MapControlsProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
+  // Toggle month picker
+  const toggleMonthPicker = () => {
+    setShowMonthPicker(prev => !prev);
+  };
+
+  // Get formatted label for current selection
+  const getCurrentSelectionLabel = () => {
+    if (!selectedMonth || selectedMonth === "all") {
+      return "All Time";
+    }
+    
+    try {
+      const date = new Date(selectedMonth);
+      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } catch (e) {
+      console.error("Error parsing date:", e);
+      return "All Time";
+    }
+  };
+
   const controlClass = "w-8 h-8 flex items-center justify-center transition-transform duration-200 hover:scale-110";
   const activeClass = "bg-blue-100 dark:bg-purple-900 border-blue-500 dark:border-purple-600 text-[#007AFF] dark:text-white";
 
   return (
     <div 
-      className={`fixed bottom-4 right-4 flex flex-col gap-1 z-10 transition-all duration-500 ease-in-out ${
+      className={`fixed ${isMobile ? 'bottom-4 left-1/2 -translate-x-1/2' : 'bottom-4 right-4'} 
+      ${isMobile ? 'flex flex-row gap-1' : 'flex flex-col gap-1'} 
+      z-10 transition-all duration-500 ease-in-out ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
       }`}
     >
-      {/* Date control */}
-      <div className="flex flex-col gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn(controlClass)}
-            >
-              <Calendar className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 bg-background dark:bg-background border dark:border-border" align="end">
-            <CalendarComponent
-              mode="single"
-              selected={selectedDate || undefined}
-              onSelect={(date) => date && setSelectedDate(date)}
-              initialFocus
-              className="bg-background dark:bg-background text-foreground dark:text-foreground"
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
-      
-      {/* Visualization controls as a toggle switch */}
-      <div className="flex flex-col gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
-        <div className="flex flex-col gap-1">
+      {/* Visualization controls */}
+      <div className={`${isMobile ? 'flex flex-row' : 'flex flex-col'} gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl`}>
+        <div className={`${isMobile ? 'flex flex-row' : 'flex flex-col'} gap-1`}>
           <Button
             variant="ghost"
             size="icon"
@@ -78,6 +84,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
               visualizationType === "markers" ? activeClass : "text-gray-500 dark:text-gray-400"
             )}
             onClick={() => setVisualizationType("markers")}
+            title="Tooltips View"
           >
             <Map className="h-4 w-4" />
           </Button>
@@ -89,15 +96,57 @@ export const MapControls: React.FC<MapControlsProps> = ({
               visualizationType === "graphs" ? activeClass : "text-gray-500 dark:text-gray-400"
             )}
             onClick={() => setVisualizationType("graphs")}
+            title="Details View"
           >
-            <LineChart className="h-4 w-4" />
+            <Info className="h-4 w-4" />
           </Button>
         </div>
       </div>
       
+      {/* Calendar icon to trigger date picker */}
+      <div className="flex p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
+        <Button 
+          ref={calendarButtonRef}
+          variant="ghost" 
+          size="icon" 
+          className={cn(
+            controlClass, 
+            showMonthPicker ? activeClass : "",
+            "flex items-center justify-center gap-1"
+          )}
+          onClick={toggleMonthPicker}
+        >
+          <Calendar className="h-4 w-4" />
+          <span className="sr-only">Select date range</span>
+        </Button>
+      </div>
+      
+      {/* Month picker popup */}
+      <MonthPicker 
+        isOpen={showMonthPicker} 
+        onClose={() => setShowMonthPicker(false)} 
+        position={isMobile ? "top" : "left"}
+        anchor={calendarButtonRef}
+      />
+      
+      {/* Legend Toggle */}
+      {onToggleLegend && (
+        <div className="flex p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(controlClass, showLegend ? activeClass : "")}
+            onClick={onToggleLegend}
+            title={showLegend ? "Hide Legend" : "Show Legend"}
+          >
+            <Map className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+      
       {/* Zoom Controls */}
-      <div className="flex flex-col gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
-        <div className="grid grid-cols-1 gap-1">
+      <div className={`${isMobile ? 'flex flex-row' : 'flex flex-col'} gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl`}>
+        <div className={`${isMobile ? 'grid grid-cols-2' : 'grid grid-cols-1'} gap-1`}>
           <Button 
             onClick={onZoomIn} 
             variant="ghost" 
@@ -118,4 +167,8 @@ export const MapControls: React.FC<MapControlsProps> = ({
       </div>
     </div>
   );
-};
+});
+
+MapControls.displayName = "MapControls";
+
+export default MapControls;

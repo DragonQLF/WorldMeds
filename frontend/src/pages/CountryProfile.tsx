@@ -1,7 +1,7 @@
-import React from "react";
+import React, { lazy, Suspense, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, DollarSign, TrendingUp, Users, Calendar, PieChart, BarChart2, Building2, AlertTriangle, Info } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Users, Calendar, PieChart, BarChart2, Building2, AlertTriangle, Info, Shield } from "lucide-react";
 import { mockCountries } from "@/lib/mockData";
 import {
   Card,
@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   PieChart as RechartsPieChart,
   Pie,
@@ -29,7 +29,7 @@ import {
   Label,
 } from "recharts";
 import {
-  Tooltip as UITooltip,
+  Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
@@ -115,6 +115,23 @@ export const CountryProfile: React.FC = () => {
     );
   }
 
+  // Render price change indicator with fancy icons
+  const renderPriceChange = (value: number) => {
+    if (!value) return null;
+    
+    const isIncrease = value > 0;
+    return (
+      <div className={`flex items-center gap-1 ${isIncrease ? "text-red-500" : "text-emerald-500"}`}>
+        {isIncrease ? (
+          <TrendingUp className="h-4 w-4" />
+        ) : (
+          <TrendingDown className="h-4 w-4" />
+        )}
+        <span>{Math.abs(value).toFixed(1)}%</span>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -171,7 +188,10 @@ export const CountryProfile: React.FC = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{countryData.priceInflation}%</div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold">{Math.abs(countryData.priceInflation)}%</span>
+              {renderPriceChange(countryData.priceInflation)}
+            </div>
             <p className="text-xs text-muted-foreground">
               vs last year
             </p>
@@ -324,7 +344,7 @@ export const CountryProfile: React.FC = () => {
                     <YAxis>
                       <Label value="Price" angle={-90} position="left" />
                     </YAxis>
-                    <Tooltip content={<CustomTooltip />} />
+                    <RechartsTooltip content={<CustomTooltip />} />
                     <Legend />
                     <Line
                       type="monotone"
@@ -365,7 +385,7 @@ export const CountryProfile: React.FC = () => {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CustomPieTooltip />} />
+                    <RechartsTooltip content={<CustomPieTooltip />} />
                     <Legend />
                   </RechartsPieChart>
                 </ResponsiveContainer>
@@ -391,7 +411,7 @@ export const CountryProfile: React.FC = () => {
                     <YAxis>
                       <Label value="Purchases" angle={-90} position="left" />
                     </YAxis>
-                    <Tooltip content={<CustomBarTooltip />} />
+                    <RechartsTooltip content={<CustomBarTooltip />} />
                     <Legend />
                     <Bar
                       dataKey="purchases"
@@ -408,4 +428,6 @@ export const CountryProfile: React.FC = () => {
       </Tabs>
     </div>
   );
-}; 
+};
+
+export default memo(CountryProfile);

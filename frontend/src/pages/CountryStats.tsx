@@ -1,67 +1,128 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { Layout } from "@/components/layout/Layout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Legend,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import { mockCountries } from "@/lib/mockData";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowUpRight, ArrowDownRight, TrendingUp, DollarSign, ShoppingCart, Users } from "lucide-react";
+import { api } from "@/lib/api";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format, parseISO } from "date-fns";
+import { useMapContext } from "@/contexts/MapContext";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Download } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
+const CountryStats = () => {
+  const { countryId } = useParams<{ countryId: string }>();
+  const [countryData, setCountryData] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [priceData, setPriceData] = useState<any[]>([]);
+  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
+  const { darkMode } = useMapContext();
+  const navigate = useNavigate();
 
-export const CountryStats = () => {
-  const { countryId } = useParams();
-  const { data: countries, isLoading } = useQuery({
-    queryKey: ["countries"],
-    queryFn: async () => {
-      return mockCountries;
-    },
-  });
+  useEffect(() => {
+    const fetchCountryData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch basic country information
+        const countryResponse = await api.get(`/countries/${countryId}`);
+        setCountryData(countryResponse.data);
+        
+        // Fetch historical price data
+        const priceResponse = await api.get(`/countries/${countryId}/price-history`);
+        const formattedPriceData = priceResponse.data.map((item: any) => ({
+          ...item,
+          date: format(parseISO(item.date), 'MMM yyyy'),
+          averagePrice: parseFloat(item.averagePrice)
+        }));
+        setPriceData(formattedPriceData);
+        
+        // Fetch medicine availability data
+        const availabilityResponse = await api.get(`/countries/${countryId}/medicine-availability`);
+        setAvailabilityData(availabilityResponse.data);
+        
+      } catch (err: any) {
+        console.error("Error fetching country stats:", err);
+        setError(err.message || "Failed to load country statistics");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (countryId) {
+      fetchCountryData();
+    }
+  }, [countryId]);
 
-  const country = countries?.find((c) => c.id === countryId);
+  const handleExportData = () => {
+    // Create CSV content
+    const csvContent = [
+      // CSV header
+      ["Date", "Average Price (USD)", "Available Medicines"],
+      // CSV data rows
+      ...priceData.map(item => [
+        item.date,
+        item.averagePrice.toFixed(2),
+        item.medicineCount || "N/A"
+      ])
+    ]
+      .map(row => row.join(","))
+      .join("\n");
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${countryData?.name || "country"}_medicine_data.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Layout>
-        <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-          <div className="flex items-center justify-center h-64">
-            <p>Loading country statistics...</p>
+        <div className="container mx-auto p-4">
+          <div className="flex items-center mb-6">
+            <Button variant="ghost" onClick={() => navigate(-1)} className="mr-2">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Skeleton className="h-[350px] w-full" />
+            <Skeleton className="h-[350px] w-full" />
           </div>
         </div>
       </Layout>
     );
   }
 
-  if (!country) {
+  if (error) {
     return (
       <Layout>
-        <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-          <div className="flex items-center justify-center h-64">
-            <p>Country not found</p>
+        <div className="container mx-auto p-4">
+          <div className="flex items-center mb-6">
+            <Button variant="ghost" onClick={() => navigate(-1)} className="mr-2">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-bold">Error</h1>
           </div>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-destructive">{error}</p>
+              <Button onClick={() => window.location.reload()} className="mt-4">
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );
@@ -69,226 +130,193 @@ export const CountryStats = () => {
 
   return (
     <Layout>
-      <ScrollArea className="h-[calc(100vh-4rem)]">
-        <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-bold tracking-tight">{country.name} Statistics</h2>
+      <div className="container mx-auto p-4">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Button variant="ghost" onClick={() => navigate(-1)} className="mr-2">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-bold">{countryData?.name} Medicine Statistics</h1>
           </div>
+          <Button variant="outline" onClick={handleExportData}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Data
+          </Button>
+        </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{country.totalExpensesUSD}</div>
-                <p className="text-xs text-muted-foreground">
-                  {country.totalExpenses} in local currency
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Per Capita Expenses</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{country.perCapitaExpensesUSD}</div>
-                <p className="text-xs text-muted-foreground">
-                  {country.perCapitaExpenses} per person
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Price Inflation</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{country.priceInflation}%</div>
-                <p className="text-xs text-muted-foreground">
-                  Year-over-year change
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Medicines</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{country.total_medicines.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Available in market
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
+        <Tabs defaultValue="prices" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="prices">Price Trends</TabsTrigger>
+            <TabsTrigger value="availability">Medicine Availability</TabsTrigger>
+            <TabsTrigger value="comparison">Global Comparison</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="prices">
             <Card>
               <CardHeader>
-                <CardTitle>Price Trends</CardTitle>
-                <CardDescription>Historical price changes</CardDescription>
+                <CardTitle>Medicine Price Trends</CardTitle>
+                <CardDescription>
+                  Average medicine prices in {countryData?.name} over time (USD)
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={country.priceTrends}>
-                      <defs>
-                        <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Area
-                        type="monotone"
-                        dataKey="price"
-                        stroke="#8884d8"
-                        fillOpacity={1}
-                        fill="url(#colorPrice)"
-                        name="Average Price"
+                    <LineChart
+                      data={priceData}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke={darkMode ? "#9ca3af" : "#6b7280"}
                       />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Medicine Distribution</CardTitle>
-                <CardDescription>By category</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={country.medicineDistribution}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}%`}
-                      >
-                        {country.medicineDistribution.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
+                      <YAxis 
+                        stroke={darkMode ? "#9ca3af" : "#6b7280"}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                          borderColor: darkMode ? "#374151" : "#e5e7eb",
+                          color: darkMode ? "#f9fafb" : "#111827"
+                        }}
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, "Average Price"]}
+                      />
                       <Legend />
-                    </PieChart>
+                      <Line
+                        type="monotone"
+                        dataKey="averagePrice"
+                        name="Average Price"
+                        stroke="#2563eb"
+                        activeDot={{ r: 8 }}
+                        strokeWidth={2}
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Seasonal Purchase Patterns</CardTitle>
-              <CardDescription>Monthly medicine purchases</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={country.seasonalData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="purchases"
-                      stroke="#8884d8"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="Purchases"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2">
+          </TabsContent>
+          
+          <TabsContent value="availability">
             <Card>
               <CardHeader>
-                <CardTitle>Top Medicines</CardTitle>
-                <CardDescription>Most purchased medications</CardDescription>
+                <CardTitle>Medicine Availability</CardTitle>
+                <CardDescription>
+                  Number of medicines available in {countryData?.name} by category
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={country.topMedicines}
-                      layout="vertical"
+                      data={availabilityData}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" width={150} />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                      <XAxis 
+                        dataKey="category" 
+                        stroke={darkMode ? "#9ca3af" : "#6b7280"}
+                      />
+                      <YAxis 
+                        stroke={darkMode ? "#9ca3af" : "#6b7280"}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                          borderColor: darkMode ? "#374151" : "#e5e7eb",
+                          color: darkMode ? "#f9fafb" : "#111827"
+                        }}
+                      />
                       <Legend />
-                      <Bar dataKey="quantity" fill="#8884d8" name="Quantity Sold" />
+                      <Bar 
+                        dataKey="count" 
+                        name="Available Medicines" 
+                        fill="#10b981" 
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
-
+          </TabsContent>
+          
+          <TabsContent value="comparison">
             <Card>
               <CardHeader>
-                <CardTitle>Market Insights</CardTitle>
-                <CardDescription>Key market indicators</CardDescription>
+                <CardTitle>Global Price Comparison</CardTitle>
+                <CardDescription>
+                  How {countryData?.name}'s medicine prices compare to global averages
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Pharmacies</p>
-                      <p className="text-2xl font-bold">
-                        {country.marketInsights.totalPharmacies.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Avg. Pharmacy Revenue</p>
-                      <p className="text-2xl font-bold">
-                        {country.marketInsights.averagePharmacyRevenue}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Healthcare Spending</p>
-                      <p className="text-2xl font-bold">
-                        {country.marketInsights.healthcareSpendingGDP}% of GDP
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Market Growth</p>
-                      <p className="text-2xl font-bold">
-                        {country.marketInsights.marketGrowth}
-                      </p>
-                    </div>
-                  </div>
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        {
+                          name: "Antibiotics",
+                          country: countryData?.antibioticPrice || 0,
+                          global: countryData?.globalAntibioticPrice || 0
+                        },
+                        {
+                          name: "Pain Relief",
+                          country: countryData?.painReliefPrice || 0,
+                          global: countryData?.globalPainReliefPrice || 0
+                        },
+                        {
+                          name: "Chronic Disease",
+                          country: countryData?.chronicDiseasePrice || 0,
+                          global: countryData?.globalChronicDiseasePrice || 0
+                        },
+                        {
+                          name: "Overall",
+                          country: countryData?.averagePrice || 0,
+                          global: countryData?.globalAveragePrice || 0
+                        }
+                      ]}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                      <XAxis 
+                        dataKey="name" 
+                        stroke={darkMode ? "#9ca3af" : "#6b7280"}
+                      />
+                      <YAxis 
+                        stroke={darkMode ? "#9ca3af" : "#6b7280"}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                          borderColor: darkMode ? "#374151" : "#e5e7eb",
+                          color: darkMode ? "#f9fafb" : "#111827"
+                        }}
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, ""]}
+                      />
+                      <Legend />
+                      <Bar 
+                        dataKey="country" 
+                        name={`${countryData?.name}`} 
+                        fill="#3b82f6" 
+                      />
+                      <Bar 
+                        dataKey="global" 
+                        name="Global Average" 
+                        fill="#ef4444" 
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </ScrollArea>
+          </TabsContent>
+        </Tabs>
+      </div>
     </Layout>
   );
-}; 
+};
+
+export default CountryStats;

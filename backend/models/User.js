@@ -1,3 +1,4 @@
+
 const db = require('../db');
 const bcrypt = require('bcryptjs');
 
@@ -5,7 +6,7 @@ class User {
   // Find a user by their ID
   static async findById(id) {
     return new Promise((resolve, reject) => {
-      const query = 'SELECT id, first_name, last_name, email FROM users WHERE id = ?';
+      const query = 'SELECT id, first_name, last_name, email, role FROM users WHERE id = ?';
       db.query(query, [id], (err, results) => {
         if (err) return reject(err);
         
@@ -20,7 +21,8 @@ class User {
           last_name: results[0].last_name,
           firstName: results[0].first_name,
           lastName: results[0].last_name,
-          email: results[0].email
+          email: results[0].email,
+          role: results[0].role || 'user'
         };
         
         resolve(user);

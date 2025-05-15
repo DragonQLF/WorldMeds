@@ -3,13 +3,7 @@
 
 import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
-
-type ThemeProviderProps = {
-  children: React.ReactNode;
-  defaultTheme?: string;
-  storageKey?: string;
-  enableSystem?: boolean;
-};
+import { type ThemeProviderProps } from "next-themes/dist/types";
 
 export function ThemeProvider({ 
   children, 
@@ -62,7 +56,7 @@ export function ThemeProvider({
   }, []);
 
   if (!mounted) {
-    return null;
+    return <>{children}</>;
   }
 
   return (
@@ -77,3 +71,6 @@ export function ThemeProvider({
     </NextThemesProvider>
   );
 }
+
+// Export the ThemeProvider component directly
+export default ThemeProvider;

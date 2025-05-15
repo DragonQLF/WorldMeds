@@ -3,34 +3,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/icone.png" id="favicon" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WorldMeds - Global Medicine Price Comparison</title>
-    <meta name="description" content="Compare medicine prices across countries and analyze inflation trends in the pharmaceutical sector." />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-      // Check if the user prefers dark mode
-      const darkModePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const storedTheme = localStorage.getItem('worldmeds-theme');
-      const userTheme = storedTheme ? storedTheme : (darkModePreferred ? 'dark' : 'light');
-      
-      // Set the favicon based on theme
-      const favicon = document.getElementById('favicon');
-      if (favicon) {
-        favicon.href = userTheme === 'dark' ? '/icone-dark.png' : '/icone.png';
-      }
-      
-      // Listen for changes to theme
-      window.addEventListener('storage', function(e) {
-        if (e.key === 'worldmeds-theme') {
-          const newTheme = e.newValue || 'light';
-          const favicon = document.getElementById('favicon');
-          if (favicon) {
-            favicon.href = newTheme === 'dark' ? '/icone-dark.png' : '/icone.png';
-          }
-        }
-      });
-    </script>
+    <title>Medicine Price Tracker</title>
+    <meta name="description" content="Global Medicine Price Tracker - Compare medicine prices across countries" />
   </head>
   <body>
     <div id="root"></div>
