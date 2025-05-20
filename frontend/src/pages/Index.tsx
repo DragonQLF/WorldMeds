@@ -1,13 +1,12 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import InteractiveMap from "@/components/map/InteractiveMap";
-import { SearchModal } from "@/components/search/SearchModal";
 import { useMapContext } from "@/contexts/MapContext";
 import { CountryDetail } from "@/components/map/CountryDetail";
-import { Info, Settings } from "lucide-react";
+import { ComparisonModal } from "@/components/comparison/ComparisonModal";
+import { GitCompare, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -15,12 +14,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SearchSelectionModal } from "@/components/search/SearchSelectionModal";
 
 const Index = () => {
   const [selectedCountryId, setSelectedCountryId] = useState<string | null>(null);
   const [showCountryDetail, setShowCountryDetail] = useState<boolean>(false);
+  const [comparisonModalOpen, setComparisonModalOpen] = useState<boolean>(false);
+  const [searchSelectionOpen, setSearchSelectionOpen] = useState<boolean>(false);
   const { darkMode, visualizationType, selectedDate, dateRange, selectedMonth } = useMapContext();
   const isMobile = useIsMobile();
   
@@ -60,82 +61,57 @@ const Index = () => {
     setShowCountryDetail(false);
   };
   
-  // Get current selection label
-  const getCurrentMonthLabel = () => {
-    if (!selectedMonth || selectedMonth === "all") {
-      return "All Time";
-    }
-    
-    try {
-      const date = parseISO(selectedMonth);
-      return format(date, 'MMM yyyy');
-    } catch (e) {
-      console.error("Error parsing date:", e);
-      return "All Time";
-    }
-  };
-
+  // Button style class for map control matching - exactly the same as in MapControls
+  const controlButtonClass = "w-8 h-8 flex items-center justify-center transition-all duration-200 hover:scale-110 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:border-primary active:border-primary";
+  
   return (
     <Layout>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background dark:bg-gray-950">
-        {/* Search and help buttons */}
+        {/* Search and actions buttons */}
         <div className={cn(
           "absolute z-10 flex space-x-2",
           isMobile ? "top-2 right-2" : "top-4 right-4"
         )}>
-          <SearchModal type="country" onSelect={handleCountrySelect} />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link to="/settings">
-                  <Button
-                    variant="outline"
-                    size={isMobile ? "icon" : "sm"}
-                    className={cn(
-                      "flex items-center justify-center",
-                      isMobile ? "w-8 h-8" : "w-8 h-8 md:w-auto md:h-auto md:px-3 md:py-2",
-                      "bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm"
-                    )}
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span className="hidden md:inline ml-2">Settings</span>
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side={isMobile ? "left" : "bottom"}>
-                Configure application settings
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* Search button that opens the selection modal */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="outline"
-                  size={isMobile ? "icon" : "sm"}
+                  variant="ghost"
+                  size="icon"
                   className={cn(
-                    "flex items-center justify-center",
-                    isMobile ? "w-8 h-8" : "w-8 h-8 md:w-auto md:h-auto md:px-3 md:py-2",
-                    "bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm"
+                    controlButtonClass,
+                    searchSelectionOpen ? "border-primary bg-blue-100 dark:bg-purple-900" : ""
                   )}
+                  onClick={() => setSearchSelectionOpen(true)}
                 >
-                  <Info className="h-4 w-4" />
-                  <span className="hidden md:inline ml-2">Guide</span>
+                  <Search className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side={isMobile ? "left" : "bottom"} className="max-w-[300px] p-4">
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-sm">How to use the map:</h4>
-                  <ul className="text-xs space-y-1 list-disc pl-4">
-                    <li>Colors represent medicine prices relative to global average</li>
-                    <li>Click on a country to view detailed medicine information</li>
-                    <li>Use the map controls to change view mode and time period</li>
-                    <li>Toggle the legend to understand the color coding</li>
-                    <li>Search for countries using the search button</li>
-                    <li>Change display settings in the Settings page</li>
-                    <li>All prices shown are per package (sale price)</li>
-                  </ul>
-                </div>
+              <TooltipContent side={isMobile ? "left" : "bottom"}>
+                Search countries or medicines
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          {/* Comparison Button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    controlButtonClass,
+                    comparisonModalOpen ? "border-primary bg-blue-100 dark:bg-purple-900" : ""
+                  )}
+                  onClick={() => setComparisonModalOpen(true)}
+                >
+                  <GitCompare className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side={isMobile ? "left" : "bottom"}>
+                Compare medicine prices
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -152,6 +128,19 @@ const Index = () => {
             onClose={handleCloseCountryDetail}
           />
         )}
+        
+        {/* Comparison Modal */}
+        <ComparisonModal
+          isOpen={comparisonModalOpen}
+          onClose={() => setComparisonModalOpen(false)}
+        />
+
+        {/* Search Selection Modal */}
+        <SearchSelectionModal 
+          isOpen={searchSelectionOpen}
+          onClose={() => setSearchSelectionOpen(false)}
+          onSelect={handleCountrySelect}
+        />
       </div>
     </Layout>
   );

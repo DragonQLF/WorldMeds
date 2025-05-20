@@ -1,8 +1,8 @@
+
 import React, { lazy, Suspense, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Users, Calendar, PieChart, BarChart2, Building2, AlertTriangle, Info, Shield } from "lucide-react";
-import { mockCountries } from "@/lib/mockData";
 import {
   Card,
   CardContent,
@@ -85,12 +85,35 @@ export const CountryProfile: React.FC = () => {
   const { countryId } = useParams();
   const navigate = useNavigate();
 
+  // Placeholder for future API integration
   const { data: countryData, isLoading } = useQuery({
     queryKey: ["countryProfile", countryId],
     queryFn: async () => {
-      const country = mockCountries.find(c => c.id === countryId);
-      if (!country) throw new Error("Country not found");
-      return country;
+      // This is a temporary placeholder that returns empty data
+      // Will be replaced with actual API call in the future
+      return {
+        id: countryId,
+        name: "Country name unavailable",
+        totalExpenses: "N/A",
+        totalExpensesUSD: "N/A",
+        perCapitaExpenses: "N/A",
+        perCapitaExpensesUSD: "N/A",
+        priceInflation: 0,
+        mostBoughtMedicine: "N/A",
+        mostBoughtQuantity: "N/A",
+        marketInsights: {
+          totalPharmacies: 0,
+          averagePharmacyRevenue: "N/A",
+          mostExpensiveMedicine: "N/A",
+          priceRange: "N/A",
+          marketGrowth: "N/A",
+          regulatoryStatus: "N/A"
+        },
+        topMedicines: [],
+        priceTrends: [],
+        medicineDistribution: [],
+        seasonalData: []
+      };
     },
     enabled: !!countryId,
   });
@@ -225,42 +248,42 @@ export const CountryProfile: React.FC = () => {
                   <Building2 className="h-4 w-4 text-muted-foreground" />
                   <span>Total Pharmacies</span>
                 </div>
-                <span className="font-medium">{countryData.marketInsights.totalPharmacies.toLocaleString()}</span>
+                <span className="font-medium">{countryData.marketInsights?.totalPharmacies?.toLocaleString() || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                   <span>Avg. Pharmacy Revenue</span>
                 </div>
-                <span className="font-medium">{countryData.marketInsights.averagePharmacyRevenue}</span>
+                <span className="font-medium">{countryData.marketInsights?.averagePharmacyRevenue || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                   <span>Most Expensive Medicine</span>
                 </div>
-                <span className="font-medium">{countryData.marketInsights.mostExpensiveMedicine}</span>
+                <span className="font-medium">{countryData.marketInsights?.mostExpensiveMedicine || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Info className="h-4 w-4 text-muted-foreground" />
                   <span>Price Range</span>
                 </div>
-                <span className="font-medium">{countryData.marketInsights.priceRange}</span>
+                <span className="font-medium">{countryData.marketInsights?.priceRange || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                   <span>Market Growth</span>
                 </div>
-                <span className="font-medium">{countryData.marketInsights.marketGrowth}</span>
+                <span className="font-medium">{countryData.marketInsights?.marketGrowth || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4 text-muted-foreground" />
                   <span>Regulatory Status</span>
                 </div>
-                <span className="font-medium">{countryData.marketInsights.regulatoryStatus}</span>
+                <span className="font-medium">{countryData.marketInsights?.regulatoryStatus || 'N/A'}</span>
               </div>
             </div>
           </CardContent>
@@ -269,22 +292,26 @@ export const CountryProfile: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Top 5 Medicines</CardTitle>
-            <CardDescription>Most purchased medicines in {countryData.name}</CardDescription>
+            <CardDescription>Most purchased medicines</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {countryData.topMedicines.map((medicine: any, index: number) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{medicine.name}</p>
-                    <p className="text-sm text-muted-foreground">{medicine.category}</p>
+              {countryData.topMedicines && countryData.topMedicines.length > 0 ? (
+                countryData.topMedicines.map((medicine: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{medicine.name}</p>
+                      <p className="text-sm text-muted-foreground">{medicine.category}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{medicine.price}</p>
+                      <p className="text-sm text-muted-foreground">{medicine.quantity} units</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">{medicine.price}</p>
-                    <p className="text-sm text-muted-foreground">{medicine.quantity} units</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-muted-foreground">No medicine data available</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -310,15 +337,13 @@ export const CountryProfile: React.FC = () => {
                   <div>
                     <h3 className="font-medium mb-2">Price Analysis</h3>
                     <p className="text-sm text-muted-foreground">
-                      Average medicine prices have increased by {countryData.priceInflation}% compared to last year.
-                      The most significant price changes were observed in the antibiotics category.
+                      Data currently unavailable. Will be populated when connected to API.
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium mb-2">Market Trends</h3>
                     <p className="text-sm text-muted-foreground">
-                      The market is growing at a rate of {countryData.marketInsights.marketGrowth}.
-                      OTC medications continue to dominate the market, with painkillers being the most purchased category.
+                      Data currently unavailable. Will be populated when connected to API.
                     </p>
                   </div>
                 </div>
@@ -334,29 +359,33 @@ export const CountryProfile: React.FC = () => {
               <CardDescription>Medicine price inflation by year</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={countryData.priceTrends}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="year">
-                      <Label value="Year" position="bottom" />
-                    </XAxis>
-                    <YAxis>
-                      <Label value="Price" angle={-90} position="left" />
-                    </YAxis>
-                    <RechartsTooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="price"
-                      name="Average Price"
-                      stroke="#8884d8"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="h-[300px] flex items-center justify-center">
+                {countryData.priceTrends && countryData.priceTrends.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={countryData.priceTrends}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year">
+                        <Label value="Year" position="bottom" />
+                      </XAxis>
+                      <YAxis>
+                        <Label value="Price" angle={-90} position="left" />
+                      </YAxis>
+                      <RechartsTooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="price"
+                        name="Average Price"
+                        stroke="#8884d8"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-muted-foreground">No trend data available</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -369,26 +398,30 @@ export const CountryProfile: React.FC = () => {
               <CardDescription>Distribution by medicine type</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={countryData.medicineDistribution}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {countryData.medicineDistribution.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip content={<CustomPieTooltip />} />
-                    <Legend />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
+              <div className="h-[300px] flex items-center justify-center">
+                {countryData.medicineDistribution && countryData.medicineDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={countryData.medicineDistribution}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {countryData.medicineDistribution.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip content={<CustomPieTooltip />} />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-muted-foreground">No distribution data available</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -401,26 +434,30 @@ export const CountryProfile: React.FC = () => {
               <CardDescription>Monthly purchase patterns</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={countryData.seasonalData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month">
-                      <Label value="Month" position="bottom" />
-                    </XAxis>
-                    <YAxis>
-                      <Label value="Purchases" angle={-90} position="left" />
-                    </YAxis>
-                    <RechartsTooltip content={<CustomBarTooltip />} />
-                    <Legend />
-                    <Bar
-                      dataKey="purchases"
-                      name="Monthly Purchases"
-                      fill="#8884d8"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="h-[300px] flex items-center justify-center">
+                {countryData.seasonalData && countryData.seasonalData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={countryData.seasonalData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month">
+                        <Label value="Month" position="bottom" />
+                      </XAxis>
+                      <YAxis>
+                        <Label value="Purchases" angle={-90} position="left" />
+                      </YAxis>
+                      <RechartsTooltip content={<CustomBarTooltip />} />
+                      <Legend />
+                      <Bar
+                        dataKey="purchases"
+                        name="Monthly Purchases"
+                        fill="#8884d8"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-muted-foreground">No seasonal data available</p>
+                )}
               </div>
             </CardContent>
           </Card>

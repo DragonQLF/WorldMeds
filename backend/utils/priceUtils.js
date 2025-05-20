@@ -1,9 +1,10 @@
+
 /**
  * Utility functions for price calculations across the application
  */
 
 // Import node-fetch properly for Node.js environment
-//  const fetch = require('node-fetch'); // Ensure node-fetch is used
+// const fetch = require('node-fetch'); // Ensure node-fetch is used (v2 for CJS)
 
 /**
  * Formats the price with proper decimal places
@@ -49,6 +50,7 @@ const fetchCurrencyRates = async () => {
     const response = await fetch('https://latest.currency-api.pages.dev/v1/currencies/usd.json');
     
     if (!response.ok) {
+      console.error(`API response error (backend): ${response.status} ${response.statusText}`);
       throw new Error(`API response error: ${response.status} ${response.statusText}`);
     }
     
@@ -71,10 +73,11 @@ const fetchCurrencyRates = async () => {
       
       return data.usd;
     } else {
+      console.error('Invalid response format from currency API (backend)');
       throw new Error('Invalid response format from currency API (backend)');
     }
   } catch (error) {
-    console.error('Error in fetchCurrencyRates (backend):', error.message, error.stack);
+    console.error('Error in fetchCurrencyRates (backend):', error.message); // Log only message
     
     // Fall back to static rates if API call fails
     console.log('Falling back to static currency rates due to fetch error (backend).');
@@ -195,5 +198,6 @@ module.exports = {
   formatPrice,
   preparePriceData,
   convertToUSD,
-  fetchCurrencyRates
+  fetchCurrencyRates // Export fetchCurrencyRates
 };
+

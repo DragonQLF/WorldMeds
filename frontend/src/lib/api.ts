@@ -1,3 +1,4 @@
+
 import axios, { AxiosError, AxiosHeaders } from "axios";
 
 // Use the environment variable defined in the .env file
@@ -49,7 +50,7 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
   try {
     // Check if we have valid cached rates
     if (currencyRatesCache && (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION)) {
-      console.log('Using cached currency rates (frontend)');
+      // console.log('Using cached currency rates (frontend)'); // Less spam
       return currencyRatesCache.rates;
     }
     
@@ -57,7 +58,7 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
     console.log('Fetching currency rates: Trying backend first (frontend)');
     
     try {
-      const backendResponse = await api.get('/currency-rates');
+      const backendResponse = await api.get('/currency-rates'); // This is /api/currency-rates relative to API_BASE_URL
       if (backendResponse.data && Object.keys(backendResponse.data).length > 0) {
         currencyRatesCache = {
           timestamp: Date.now(),
@@ -68,7 +69,7 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
       }
       console.warn('Backend returned no/empty data for currency rates (frontend).');
     } catch (backendError) {
-      console.warn('Failed to fetch rates from backend, trying direct API (frontend). Error:', backendError);
+      console.warn('Failed to fetch rates from backend, trying direct API (frontend). Error:', backendError instanceof Error ? backendError.message : backendError);
     }
     
     console.log('Fetching fresh currency rates from direct API (frontend)');
@@ -91,14 +92,14 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
       throw new Error('Invalid response format from direct currency API (frontend)');
     }
   } catch (error) {
-    console.error('Error fetching currency rates (frontend):', error);
+    console.error('Error fetching currency rates (frontend):', error instanceof Error ? error.message : error);
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError;
       console.error('Axios error details (frontend):', {
         message: axiosError.message,
         code: axiosError.code,
         status: axiosError.response?.status,
-        data: axiosError.response?.data,
+        // data: axiosError.response?.data, // Can be verbose
       });
       if (axiosError.response?.status === 401) {
         console.error("Received 401 Unauthorized from direct currency API. Check if API key/access changed.");
