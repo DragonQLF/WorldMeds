@@ -45,3 +45,25 @@ export function formatPrice(amount: number | null | undefined, currencyCode: str
   const symbol = getCurrencySymbol(currencyCode);
   return `${symbol}${Number(amount).toFixed(2)}`;
 }
+
+/**
+ * Calculate percentage change between two values
+ * @param current Current value
+ * @param previous Previous value
+ * @returns Percentage change or null if calculation isn't possible
+ */
+export function calculatePercentChange(current?: number, previous?: number): number | null {
+  if (typeof current !== 'number' || typeof previous !== 'number' || 
+      isNaN(current) || isNaN(previous) || previous === 0) {
+    return null;
+  }
+  
+  const change = ((current - previous) / previous) * 100;
+  
+  // Limit to reasonable values (-50% to +50%)
+  if (Math.abs(change) > 50) {
+    return null;
+  }
+  
+  return change;
+}

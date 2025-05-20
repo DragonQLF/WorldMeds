@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, memo } from "react";
-import { Calendar, ZoomIn, ZoomOut, Map, Info } from "lucide-react";
+import { Calendar, ZoomIn, ZoomOut, Map, Layers } from "lucide-react";
 import { useMapContext } from "@/contexts/MapContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -47,21 +47,6 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
     setShowMonthPicker(prev => !prev);
   };
 
-  // Get formatted label for current selection
-  const getCurrentSelectionLabel = () => {
-    if (!selectedMonth || selectedMonth === "all") {
-      return "All Time";
-    }
-    
-    try {
-      const date = new Date(selectedMonth);
-      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    } catch (e) {
-      console.error("Error parsing date:", e);
-      return "All Time";
-    }
-  };
-
   const controlClass = "w-8 h-8 flex items-center justify-center transition-transform duration-200 hover:scale-110";
   const activeClass = "bg-blue-100 dark:bg-purple-900 border-blue-500 dark:border-purple-600 text-[#007AFF] dark:text-white";
 
@@ -84,10 +69,11 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
               visualizationType === "markers" ? activeClass : "text-gray-500 dark:text-gray-400"
             )}
             onClick={() => setVisualizationType("markers")}
-            title="Tooltips View"
+            title="Markers View"
           >
             <Map className="h-4 w-4" />
           </Button>
+          
           <Button
             variant="ghost"
             size="icon"
@@ -96,9 +82,9 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
               visualizationType === "graphs" ? activeClass : "text-gray-500 dark:text-gray-400"
             )}
             onClick={() => setVisualizationType("graphs")}
-            title="Details View"
+            title="Detailed View"
           >
-            <Info className="h-4 w-4" />
+            <Layers className="h-4 w-4" />
           </Button>
         </div>
       </div>

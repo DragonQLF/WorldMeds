@@ -3,13 +3,10 @@ const db = require("./db");
 const cors = require("cors");
 const path = require('path');
 const fs = require('fs');
-const mkdirp = require('mkdirp');
-const { authenticateOptional } = require('./middleware/auth');
-const multer = require("multer");
 const config = require('./config');
 const http = require('http');
 const { setupWebsocketServer } = require('./websocket');
-const { formatPrice, preparePriceData, convertToUSD } = require('./utils/priceUtils');
+const { formatPrice, preparePriceData, convertToUSD, fetchCurrencyRates: fetchBackendCurrencyRates } = require('./utils/priceUtils');
 
 const app = express();
 const port = config.PORT;
@@ -39,10 +36,32 @@ app.use(express.json());
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const comparisonRoutes = require('./routes/comparisonRoutes');
 
 app.use('/api/admin', adminRoutes);
 
+// Comparison routes for medicine price comparison
+app.use('/api/comparison', comparisonRoutes);
+
 // Public API endpoints - No authentication required
+
+// NEW Endpoint to provide currency rates to the frontend
+app.get("/api/currency-rates", async (req, res) => {
+  try {
+    console.log("Backend /api/currency-rates endpoint hit");
+    const rates = await fetchBackendCurrencyRates();
+    if (rates && Object.keys(rates).length > 0) {
+      res.json(rates);
+    } else {
+      // This case implies fallback to static rates or an empty object if initial fetch failed badly
+      console.warn("Backend /api/currency-rates returning potentially static or empty rates.");
+      res.json(rates || STATIC_CURRENCY_RATES); // Send static if rates is null/undefined
+    }
+  } catch (error) {
+    console.error("Error in /api/currency-rates endpoint (backend):", error);
+    res.status(500).json({ error: "Failed to fetch currency rates" });
+  }
+});
 
 // Get global average medicine price - UPDATED to convert to USD before averaging
 app.get("/api/global-average-medicine-price", async (req, res) => {
