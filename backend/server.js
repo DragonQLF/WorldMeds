@@ -1,3 +1,4 @@
+
 const express = require("express");
 const db = require("./db");
 const cors = require("cors");
@@ -88,6 +89,9 @@ app.get("/api/global-average-medicine-price", async (req, res) => {
         sql += ` AND DATE(mc.month) <= ?`;
         params.push(req.query.end);
       }
+    } else if (req.query.month) {
+      sql += ` WHERE DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+      params.push(req.query.month);
     }
     
     // Execute the query to get all prices with their currencies
@@ -120,7 +124,7 @@ app.get("/api/global-average-medicine-price", async (req, res) => {
       // Format the result
       const globalAverage = formatPrice(avg) || 0;
       
-      console.log(`Calculated global average from ${validPrices.length} valid prices: $${globalAverage} USD`);
+      console.log(`Calculated global average from ${validPrices.length} valid prices: $${globalAverage} USD with month filter: ${req.query.month || 'none'}`);
       res.json({ global_average: globalAverage });
     });
   } catch (error) {
@@ -163,10 +167,7 @@ app.get("/api/countries-average-prices", (req, res) => {
     sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
     params.push(req.query.month);
   } else {
-    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = DATE_FORMAT(
-      (SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id),
-      '%Y-%m'
-    )`;
+    sql += ``;
   }
   
   sql += `
@@ -198,10 +199,7 @@ app.get("/api/countries-average-prices", (req, res) => {
     sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
     params.push(req.query.month);
   } else {
-    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = DATE_FORMAT(
-      (SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id),
-      '%Y-%m'
-    )`;
+    sql += ``;
   }
   
   sql += `
@@ -218,7 +216,10 @@ app.get("/api/countries-average-prices", (req, res) => {
           WHERE mc.country_id = c.id
           AND DATE_FORMAT(mc.month, '%Y-%m') = DATE_FORMAT(
             DATE_SUB(
-              (SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id), 
+              CASE
+                WHEN ? IS NOT NULL THEN STR_TO_DATE(CONCAT(?, '-01'), '%Y-%m-%d')
+                ELSE (SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id)
+              END,
               INTERVAL 1 MONTH
             ),
             '%Y-%m'
@@ -242,6 +243,13 @@ app.get("/api/countries-average-prices", (req, res) => {
     FROM countries c;
   `;
   
+  // Add month parameter twice for the previous month calculation
+  if (req.query.month) {
+    params.push(req.query.month, req.query.month);
+  } else {
+    params.push(null, null);
+  }
+  
   db.query(sql, params, async (err, results) => {
     if (err) {
       console.error("Error fetching countries averages:", err);
@@ -264,6 +272,7 @@ app.get("/api/countries-average-prices", (req, res) => {
       country.previousPrice = formatPrice(country.previousPrice);
     }
     
+    console.log(`Returning countries data with month filter: ${req.query.month || 'none'}`);
     res.json(results);
   });
 });
@@ -364,6 +373,9 @@ app.get("/api/country/:countryId/average-medicine-price", (req, res) => {
       sql += ` AND DATE(mc.month) <= ?`;
       params.push(req.query.end);
     }
+  } else if (req.query.month) {
+    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+    params.push(req.query.month);
   }
   
   sql += `
@@ -409,6 +421,9 @@ app.get("/api/country/:countryId/details", (req, res) => {
       sql += ` AND DATE(mc.month) <= ?`;
       params.push(req.query.end);
     }
+  } else if (req.query.month) {
+    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+    params.push(req.query.month);
   }
   
   sql += ` GROUP BY c.id;`;
@@ -418,6 +433,7 @@ app.get("/api/country/:countryId/details", (req, res) => {
       console.error("Error fetching country details:", err);
       return res.status(500).json({ error: "Database error" });
     }
+    console.log(`Country details for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, results[0]);
     res.json(results[0] || null);
   });
 });
@@ -453,6 +469,9 @@ app.get("/api/country/:countryId/medicines", (req, res) => {
       sql += ` AND DATE(mc.month) <= ?`;
       params.push(req.query.end);
     }
+  } else if (req.query.month) {
+    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+    params.push(req.query.month);
   }
   
   db.query(sql, params, (err, results) => {
@@ -488,6 +507,9 @@ app.get("/api/country/:countryId/summary", (req, res) => {
       sql += ` AND DATE(mc.month) <= ?`;
       params.push(req.query.end);
     }
+  } else if (req.query.month) {
+    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+    params.push(req.query.month);
   }
   
   sql += ` GROUP BY c.id;`;
@@ -497,6 +519,7 @@ app.get("/api/country/:countryId/summary", (req, res) => {
       console.error("Error fetching summary:", err);
       return res.status(500).json({ error: "Database error" });
     }
+    console.log(`Country summary for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, results[0]);
     res.json(results[0] || null);
   });
 });
@@ -554,6 +577,7 @@ app.get("/api/country/:countryId/top-medicines", (req, res) => {
       medicine.originalPrice = formatPrice(medicine.originalPrice);
     });
     
+    console.log(`Top medicines for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`);
     res.json(results);
   });
 });

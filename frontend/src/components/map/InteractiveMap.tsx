@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   ComposableMap,
@@ -25,6 +26,7 @@ interface CountryData {
   conversionRate?: number;
   totalMedicines: number;
   pillsPerPackage?: number;
+  month?: string;
 }
 
 interface TooltipData {
@@ -46,7 +48,7 @@ interface CurrencyRates {
 const geoUrl = "/features.json";
 
 const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
-  const { visualizationType, darkMode, selectedDate, dateRange, selectedMonth } = useMapContext();
+  const { visualizationType, darkMode, selectedDate, dateRange, selectedMonth, useTimeFiltering } = useMapContext();
   const { isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -100,7 +102,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       }
       
       // If currency is not USD, and we have a rate, convert to USD
-      // API rates are USD to currency, so to convert to USD we divide
+      // API rates are USD to currency we divide
       return amount / rate;
     } catch (error) {
       console.warn(`Error converting ${currency} to USD:`, error);
@@ -128,21 +130,26 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       let dateParam = '';
       let previousMonth = '';
       
-      if (selectedDate) {
-        const formattedDate = selectedDate.toISOString().split('T')[0];
-        dateParam = `?date=${formattedDate}`;
-      } else if (dateRange && dateRange.from) {
-        const from = dateRange.from.toISOString().split('T')[0];
-        const to = dateRange.to ? dateRange.to.toISOString().split('T')[0] : '';
-        dateParam = `?start=${from}${to ? `&end=${to}` : ''}`;
-      } else if (selectedMonth && selectedMonth !== 'all') {
-        dateParam = `?month=${selectedMonth}`;
-        
-        // Calculate previous month for comparison
-        const currentDate = new Date(selectedMonth + "-01");
-        const prevDate = new Date(currentDate);
-        prevDate.setMonth(prevDate.getMonth() - 1);
-        previousMonth = prevDate.toISOString().split('T')[0].substring(0, 7); // Get YYYY-MM format
+      if (useTimeFiltering) {
+        if (selectedDate) {
+          const formattedDate = selectedDate.toISOString().split('T')[0];
+          dateParam = `?date=${formattedDate}`;
+          console.log("Using date parameter:", dateParam);
+        } else if (dateRange && dateRange.from) {
+          const from = dateRange.from.toISOString().split('T')[0];
+          const to = dateRange.to ? dateRange.to.toISOString().split('T')[0] : '';
+          dateParam = `?start=${from}${to ? `&end=${to}` : ''}`;
+          console.log("Using date range parameter:", dateParam);
+        } else if (selectedMonth && selectedMonth !== 'all') {
+          dateParam = `?month=${selectedMonth}`;
+          console.log("Using month parameter:", dateParam);
+          
+          // Calculate previous month for comparison
+          const currentDate = new Date(selectedMonth + "-01");
+          const prevDate = new Date(currentDate);
+          prevDate.setMonth(prevDate.getMonth() - 1);
+          previousMonth = prevDate.toISOString().split('T')[0].substring(0, 7); // Get YYYY-MM format
+        }
       }
 
       // Default values in case of errors
@@ -151,6 +158,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       let previousPrices: { [key: string]: number } = {};
 
       try {
+        console.log("Fetching global average with params:", dateParam);
         const globalRes = await api.get(`/global-average-medicine-price${dateParam}`);
         globalAverageValue = parseFloat(globalRes.data.global_average) || globalAverageValue;
         
@@ -166,7 +174,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       }
 
       // If we have a selected month that's not "all", fetch previous month data for comparison
-      if (previousMonth) {
+      if (previousMonth && useTimeFiltering) {
         try {
           const prevMonthRes = await api.get(`/countries-average-prices?month=${previousMonth}`);
           prevMonthRes.data.forEach((country: any) => {
@@ -178,6 +186,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       }
 
       try {
+        console.log("Fetching country data with params:", dateParam);
         const countriesRes = await api.get(`/countries-average-prices${dateParam}`);
         
         // Process each country's data in parallel for better performance
@@ -202,7 +211,6 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
           if (originalPrice !== null && country.localCurrency && country.localCurrency !== 'USD') {
             try {
               averagePrice = await convertToUSDWithRates(originalPrice, country.localCurrency);
-              console.log(`Converted ${country.countryName} price: ${originalPrice} ${country.localCurrency} → ${averagePrice} USD`);
             } catch (err) {
               console.warn(`Currency conversion failed for ${country.countryName}:`, err);
               // Keep averagePrice as originalPrice if conversion fails
@@ -217,21 +225,12 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
             previousPrice: previousPrices[country.countryId],
             totalMedicines: country.totalMedicines || 0,
             localCurrency: country.localCurrency || 'USD',
-            pillsPerPackage: country.pillsPerPackage
+            pillsPerPackage: country.pillsPerPackage,
+            month: country.month || selectedMonth
           };
         }));
         
         countriesDataValue = processedData;
-        
-        // Debug for Chile
-        const chile = countriesDataValue.find(c => c.countryName === 'Chile');
-        if (chile) {
-          console.log('Chile data:', {
-            originalPrice: chile.originalPrice,  // Local currency price
-            averagePrice: chile.averagePrice,    // USD price
-            currency: chile.localCurrency,
-          });
-        }
       } catch (error) {
         console.warn("Could not fetch countries data", error);
       }
@@ -243,14 +242,19 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, dateRange, selectedMonth, convertToUSDWithRates]);
+  }, [selectedDate, dateRange, selectedMonth, convertToUSDWithRates, useTimeFiltering]);
 
-  // Fetch data when date filters change
+  // Fetch data when date filters change or useTimeFiltering changes
   useEffect(() => {
+    console.log("Date parameters changed, fetching new data");
+    console.log("Selected Month:", selectedMonth);
+    console.log("Selected Date:", selectedDate);
+    console.log("Date Range:", dateRange);
+    console.log("Use Time Filtering:", useTimeFiltering);
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, selectedDate, dateRange, selectedMonth, useTimeFiltering]);
 
-  // Improved getCountryColor function for better map visualization
+  // Improved getCountryColor function for better map visualization with gradual colors
   const getCountryColor = useCallback((countryName: string) => {
     // Find the country in our data
     const country = countriesData.find(
@@ -277,24 +281,29 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
     if (isNaN(priceRatio)) {
       return darkMode ? "#374151" : "#9ca3af"; // Gray for invalid data
     }
-    
-    // Special debug for Chile to check the calculations
-    if (country.countryName === 'Chile') {
-      console.log(`${country.countryName} price: ${priceForComparison} USD, global avg: ${globalAverage}, ratio: ${priceRatio}`);
-      console.log(`Original price: ${country.originalPrice}, currency: ${country.localCurrency}`);
-    }
 
-    // Return colors based on price ratio
-    if (priceRatio < 0.8) {
-      return darkMode ? "#10b981" : "#34d399"; // emerald-600/400 - much cheaper
+    // Return colors based on price ratio with more gradual colors
+    if (priceRatio < 0.70) {
+      // Much cheaper (<70% of global average)
+      return darkMode ? "#10b981" : "#34d399"; // emerald-600/400
+    } else if (priceRatio < 0.85) {
+      // Cheaper (70-85% of global average)
+      return darkMode ? "#059669" : "#6ee7b7"; // emerald-700/300
     } else if (priceRatio < 0.95) {
-      return darkMode ? "#059669" : "#6ee7b7"; // emerald-700/300 - slightly cheaper
-    } else if (priceRatio > 1.2) {
-      return darkMode ? "#ef4444" : "#f87171"; // red-500/400 - much more expensive
-    } else if (priceRatio > 1.05) {
-      return darkMode ? "#dc2626" : "#fca5a5"; // red-600/300 - slightly more expensive
+      // Slightly cheaper (85-95% of global average)
+      return darkMode ? "#047857" : "#a7f3d0"; // emerald-800/200
+    } else if (priceRatio < 1.05) {
+      // Close to average (95-105% of global average)
+      return darkMode ? "#ca8a04" : "#fcd34d"; // amber-600/300
+    } else if (priceRatio < 1.15) {
+      // Slightly more expensive (105-115% of global average)
+      return darkMode ? "#b91c1c" : "#fca5a5"; // red-700/300
+    } else if (priceRatio < 1.30) {
+      // More expensive (115-130% of global average)
+      return darkMode ? "#dc2626" : "#f87171"; // red-600/400
     } else {
-      return darkMode ? "#ca8a04" : "#fcd34d"; // amber-600/300 - close to average
+      // Much more expensive (>130% of global average)
+      return darkMode ? "#ef4444" : "#ef4444"; // red-500/500 - stronger red
     }
   }, [countriesData, globalAverage, darkMode]);
 
@@ -595,6 +604,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         <MapLegend 
           globalAverage={globalAverage}
           darkMode={darkMode}
+          selectedMonth={useTimeFiltering ? selectedMonth : null}
         />
       )}
 
