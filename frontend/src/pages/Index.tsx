@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import InteractiveMap from "@/components/map/InteractiveMap";
@@ -81,7 +80,7 @@ const Index = () => {
                   size="icon"
                   className={cn(
                     controlButtonClass,
-                    searchSelectionOpen ? "border-primary bg-blue-100 dark:bg-purple-900" : ""
+                    searchSelectionOpen ? "border-primary bg-primary/10" : ""
                   )}
                   onClick={() => setSearchSelectionOpen(true)}
                 >
@@ -103,7 +102,7 @@ const Index = () => {
                   size="icon"
                   className={cn(
                     controlButtonClass,
-                    comparisonModalOpen ? "border-primary bg-blue-100 dark:bg-purple-900" : ""
+                    comparisonModalOpen ? "border-primary bg-primary/10" : ""
                   )}
                   onClick={() => setComparisonModalOpen(true)}
                 >
@@ -122,7 +121,7 @@ const Index = () => {
         />
         
         {/* Country details modal - only show when in details view or explicitly opened */}
-        {showCountryDetail && (
+        {showCountryDetail && selectedCountryId && (
           <CountryDetail
             countryId={selectedCountryId}
             onClose={handleCloseCountryDetail}

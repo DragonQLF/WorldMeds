@@ -1,101 +1,128 @@
-# WorldMeds Backend API
 
-This is the backend API for the WorldMeds Index application.
+# WorldMeds Backend
 
-## Setup
+This directory contains the backend API server for the WorldMeds project - a global medicine price index visualization tool.
 
-1. Install dependencies:
-```bash
-npm install
-```
+## Technology Stack
 
-2. Create the database:
-```bash
-mysql -u root -p < init.sql
-```
+- Node.js
+- Express.js
+- MySQL
+- WebSockets for real-time updates
+- RESTful API architecture
 
-3. Start the server:
-```bash
-npm start
-```
+## Project Structure
 
-For development with auto-reload:
-```bash
-npm run dev
-```
-
-## Authentication
-
-The API uses JWT (JSON Web Token) for authentication. Protected routes require an `Authorization` header with a Bearer token.
-
-```
-Authorization: Bearer your-jwt-token
-```
+- `controllers`: Business logic for handling requests
+- `middleware`: Request processing middleware (authentication, validation)
+- `models`: Data models representing database entities
+- `routes`: API route definitions
+- `utils`: Utility functions for common operations
+- `server.js`: Main application entry point
+- `db.js`: Database connection and configuration
+- `config.js`: Application configuration
+- `websocket.js`: WebSocket server setup
 
 ## API Endpoints
 
-### Auth Routes
+The backend provides the following key API endpoints:
 
-- `POST /api/signup` - Register a new user
-  - Request body: `{ firstName, lastName, email, password }`
-  - Response: `{ success, message, user, token }`
+### Authentication
+- `POST /api/login`: User login
+- `POST /api/register`: User registration
+- `POST /api/forgot-password`: Password reset request
 
-- `POST /api/login` - Login
-  - Request body: `{ email, password }`
-  - Response: `{ success, message, user, token }`
+### Countries
+- `GET /api/countries`: List all countries with basic price data
+- `GET /api/countries-average-prices`: Get average medicine prices for all countries
+- `GET /api/country/:countryId/details`: Get detailed information about a specific country
+- `GET /api/country/:countryId/medicines`: Get all medicines available in a specific country
+- `GET /api/country/:countryId/top-medicines`: Get top 5 most purchased medicines in a country
+- `GET /api/country/:countryId/summary`: Get summary statistics for a country
 
-- `POST /api/forgot-password` - Request password reset
-  - Request body: `{ email }`
-  - Response: `{ success, message }`
+### Medicines
+- `GET /api/global-average-medicine-price`: Get global average medicine price
+- `GET /api/comparison/medicines`: Compare medicine prices between countries
 
-### User Routes (Protected)
+### Search
+- `GET /api/search/countries`: Search for countries by name
+- `GET /api/search/medicines`: Search for medicines by name
 
-All these routes require authentication.
+### Date Filtering
 
-- `GET /api/profile` - Get current user profile
-  - Response: `{ success, user }`
+Most endpoints support date filtering with the following query parameters:
+- `date`: Specific date (YYYY-MM-DD)
+- `start` & `end`: Date range
+- `month`: Month (YYYY-MM)
 
-- `PUT /api/profile` - Update user profile
-  - Request body: `{ firstName, lastName, email }`
-  - Response: `{ success, message, user }`
+### Admin
+- `POST /api/admin/country`: Create a new country
+- `PUT /api/admin/country/:id`: Update a country
+- `POST /api/admin/medicine`: Create a new medicine
+- `PUT /api/admin/medicine/:id`: Update a medicine
+- `DELETE /api/admin/medicine/:id`: Delete a medicine
 
-- `PUT /api/change-password` - Change password
-  - Request body: `{ currentPassword, newPassword }`
-  - Response: `{ success, message }`
+## Setting Up the Database
 
-## Middlewares
+The backend uses a MySQL database. The schema is defined in `init.sql`, which will automatically initialize the database when running with Docker Compose.
 
-- `authenticate` - Verifies JWT token and attaches user to request
-- `multer` - Handles file uploads
+## Environment Variables
 
-## Models
-
-- `User` - User model with methods for CRUD operations
-
-## Controllers
-
-- `authController` - Handles authentication (register, login, forgot password)
-- `userController` - Handles user operations (profile, upload, password change)
-
-## File Structure
+The backend requires the following environment variables:
 
 ```
-backend/
-  ├── config.js            # Configuration settings
-  ├── db.js                # Database connection
-  ├── server.js            # Main server file
-  ├── index.js             # Entry point
-  ├── init.sql             # Database initialization
-  ├── models/
-  │   └── User.js          # User model
-  ├── controllers/
-  │   ├── authController.js # Authentication controller
-  │   └── userController.js # User controller
-  ├── middleware/
-  │   └── auth.js          # Authentication middleware
-  ├── routes/
-  │   ├── authRoutes.js    # Authentication routes
-  │   └── userRoutes.js    # User routes
-  └── public/
-      └── uploads/         # Uploaded files
-``` 
+PORT=3001
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=yourpassword
+DB_NAME=worldmeds
+JWT_SECRET=your_secret_key
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost
+```
+
+These can be set in a `.env` file or passed directly to the application.
+
+## Development Setup
+
+### Prerequisites
+
+- Node.js 18+
+- MySQL 8+
+
+### Installation
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create and configure the database:
+   ```bash
+   mysql -u root -p < init.sql
+   ```
+
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. The API will be available at http://localhost:3001
+
+## Docker Deployment
+
+The backend is designed to run in a Docker container as part of the full application stack. See the root README for instructions on running the complete application with Docker Compose.
+
+## Data Processing
+
+The backend includes utilities for processing medicine price data:
+- Currency conversion to USD
+- Normalization of medicine prices
+- Calculation of aggregated metrics
+- Time-series data analysis
+
+These utilities are primarily found in the `utils` directory.

@@ -28,6 +28,8 @@ interface MapContextProps {
   availableMonths: string[];
   setAvailableMonths: React.Dispatch<React.SetStateAction<string[]>>;
   isMonthAvailable: (month: string) => boolean;
+  useTimeFiltering: boolean;
+  setUseTimeFiltering: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const defaultContext: MapContextProps = {
@@ -47,6 +49,8 @@ const defaultContext: MapContextProps = {
   availableMonths: [],
   setAvailableMonths: () => {},
   isMonthAvailable: () => false,
+  useTimeFiltering: true,
+  setUseTimeFiltering: () => {},
 };
 
 const MapContext = createContext<MapContextProps>(defaultContext);
@@ -69,6 +73,9 @@ export function MapProvider({ children }: { children: ReactNode }) {
   // Available months from the database - will be populated from API
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
+  
+  // Add time filtering state - default to true
+  const [useTimeFiltering, setUseTimeFiltering] = useState<boolean>(true);
 
   // Memoized function to check if a month is available
   const isMonthAvailable = useCallback((month: string): boolean => {
@@ -138,6 +145,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
     availableMonths,
     setAvailableMonths,
     isMonthAvailable,
+    useTimeFiltering,
+    setUseTimeFiltering,
   }), [
     visualizationType, 
     darkMode,
@@ -148,6 +157,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
     showMonthPicker,
     availableMonths,
     isMonthAvailable,
+    useTimeFiltering,
   ]);
 
   return (

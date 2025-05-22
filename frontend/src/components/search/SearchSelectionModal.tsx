@@ -55,7 +55,8 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
         <DialogContent 
           className={cn(
             "sm:max-w-md p-6",
-            darkMode ? "bg-gray-900 text-white border-gray-700" : "bg-white"
+            darkMode ? "bg-gray-900 text-white border-gray-700" : "bg-white",
+            "overflow-hidden" // Prevent content from overflowing
           )}
         >
           <DialogTitle className="text-xl font-bold text-center mb-8">Choose Search Option</DialogTitle>
@@ -77,7 +78,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
               </div>
               <div className="flex flex-col items-center text-center w-full">
                 <span className="font-medium text-lg truncate w-full">Countries</span>
-                <span className="text-xs text-center text-muted-foreground w-full break-words px-2">
+                <span className="text-xs text-center text-muted-foreground w-full px-2 line-clamp-2">
                   Find medicine prices by location
                 </span>
               </div>
@@ -99,7 +100,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
               </div>
               <div className="flex flex-col items-center text-center w-full">
                 <span className="font-medium text-lg truncate w-full">Medicines</span>
-                <span className="text-xs text-center text-muted-foreground w-full break-words px-2">
+                <span className="text-xs text-center text-muted-foreground w-full px-2 line-clamp-2">
                   Compare prices across countries
                 </span>
               </div>
