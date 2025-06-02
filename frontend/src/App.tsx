@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -15,10 +14,10 @@ const Index = lazy(() => import("./pages/Index"));
 const Settings = lazy(() => import("./pages/Settings"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const Admin = lazy(() => import("./pages/Admin"));
-const Stats = lazy(() => import("./pages/Stats"));
 const CountryStats = lazy(() => import("@/pages/CountryStats"));
 const CountryProfile = lazy(() => import("@/pages/CountryProfile"));
-const Comparison = lazy(() => import("@/pages/Comparison"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 // Loading fallback component
 const Loading = () => (
@@ -44,40 +43,60 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider 
-      defaultTheme="system" 
+    <ThemeProvider
+      defaultTheme="system"
       storageKey="worldmeds-theme"
       enableSystem={true}
     >
-      <AuthProvider>
-        <MapProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Suspense fallback={<Loading />}>
-                <Routes>
-                  {/* Public routes - accessible without login */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/country/:countryId" element={<CountryProfile />} />
-                  
-                  {/* Protected routes - require authentication */}
-                  <Route element={<ProtectedRoute />}>
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/profile" element={<ProfilePage />} />
-                    <Route path="/stats" element={<Stats />} />
-                    <Route path="/admin" element={<Admin />} />
-                    <Route path="/country/:countryId/stats" element={<CountryStats />} />
-                    <Route path="/comparison" element={<Comparison />} />
-                  </Route>
-                  
-                  <Route path="*" element={<Navigate to="/" />} />
-                </Routes>
-              </Suspense>
-            </BrowserRouter>
-          </TooltipProvider>
-        </MapProvider>
-      </AuthProvider>
+      <BrowserRouter>
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            {/* Public route for VerifyEmail - rendered outside AuthProvider */}
+            <Route path="/verify-email" element={<VerifyEmail />} />
+
+            {/* All other routes wrapped within AuthProvider and other contexts */}
+            <Route
+              path="/*" // Use a wildcard path to match all other routes
+              element={
+                <AuthProvider>
+                  <MapProvider>
+                    <TooltipProvider>
+                      <Toaster />
+                      <Sonner />
+                      <Routes> {/* Nested Routes for the rest of the application */}
+                        {/* Public routes within AuthProvider context */}
+                        <Route path="/" element={<Index />} />
+                        <Route path="/country/:countryId" element={<CountryProfile />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
+
+                        {/* Protected routes */}
+                        <Route element={<ProtectedRoute />}>
+                          <Route path="/settings" element={<Settings />} />
+                          <Route path="/profile" element={<ProfilePage />} />
+                          <Route path="/admin" element={<Admin />} />
+                          <Route path="/country/:countryId/stats" element={<CountryStats />} />
+                        </Route>
+
+                        {/* Fallback route for paths within the AuthProvider scope that don't match */}
+                        {/* Note: This nested fallback might need adjustment based on desired behavior for unmatched paths */} 
+                        {/* within or outside the authenticated area. A single top-level fallback is usually sufficient. */}
+                        {/* Keeping it simple for now based on the original structure's intent. */}
+                         {/* Removed the nested fallback to rely on the top-level one */}
+
+                      </Routes> {/* Close Nested Routes */}
+                    </TooltipProvider>
+                  </MapProvider>
+                </AuthProvider>
+              }
+            /> {/* Close wildcard Route */}
+
+            {/* Top-level fallback route for paths that don't match /verify-email or the wildcard route */}
+            {/* This catches paths that are not /verify-email and not handled within the AuthProvider's Routes */} 
+             <Route path="*" element={<Navigate to="/" />} />
+
+          </Routes> {/* Close Top-level Routes */}
+        </Suspense>
+      </BrowserRouter>
     </ThemeProvider>
   </QueryClientProvider>
 );

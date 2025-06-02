@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SearchSelectionModal } from "@/components/search/SearchSelectionModal";
+import MedicineDetail from "@/components/map/MedicineDetail";
 
 const Index = () => {
   const [selectedCountryId, setSelectedCountryId] = useState<string | null>(null);
@@ -23,6 +24,8 @@ const Index = () => {
   const [searchSelectionOpen, setSearchSelectionOpen] = useState<boolean>(false);
   const { darkMode, visualizationType, selectedDate, dateRange, selectedMonth } = useMapContext();
   const isMobile = useIsMobile();
+  const [selectedMedicineId, setSelectedMedicineId] = useState<string | null>(null);
+  const [showMedicineDetail, setShowMedicineDetail] = useState<boolean>(false);
   
   // Reset the detail view when component mounts or when date filters change
   useEffect(() => {
@@ -40,7 +43,6 @@ const Index = () => {
 
   // Handle country selection from search or map
   const handleCountrySelect = (country: any) => {
-    console.log("Selected country from search:", country);
     if (country && country.id) {
       // If selecting the same country that's already shown, close it instead
       if (selectedCountryId === country.id.toString() && showCountryDetail) {
@@ -60,9 +62,31 @@ const Index = () => {
     setShowCountryDetail(false);
   };
   
-  // Button style class for map control matching - exactly the same as in MapControls
+  // Button style class for map control matching - re-adding original styles
   const controlButtonClass = "w-8 h-8 flex items-center justify-center transition-all duration-200 hover:scale-110 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:border-primary active:border-primary";
   
+  const handleSearchSelect = (item: any) => {
+    if (item && item.id) {
+      if (item.dosage !== undefined) {
+        // It's a medicine
+        if (selectedMedicineId === item.id.toString() && showMedicineDetail) {
+          setSelectedMedicineId(null);
+          setShowMedicineDetail(false);
+        } else {
+          setSelectedMedicineId(item.id.toString());
+          setShowMedicineDetail(true);
+          setSelectedCountryId(null);
+          setShowCountryDetail(false);
+        }
+      } else {
+        // It's a country
+        handleCountrySelect(item);
+        setSelectedMedicineId(null);
+        setShowMedicineDetail(false);
+      }
+    }
+  };
+
   return (
     <Layout>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background dark:bg-gray-950">
@@ -128,6 +152,17 @@ const Index = () => {
           />
         )}
         
+        {/* Medicine details modal - only show when in details view or explicitly opened */}
+        {showMedicineDetail && selectedMedicineId && (
+          <MedicineDetail
+            medicineId={selectedMedicineId}
+            onClose={() => {
+              setSelectedMedicineId(null);
+              setShowMedicineDetail(false);
+            }}
+          />
+        )}
+        
         {/* Comparison Modal */}
         <ComparisonModal
           isOpen={comparisonModalOpen}
@@ -138,7 +173,7 @@ const Index = () => {
         <SearchSelectionModal 
           isOpen={searchSelectionOpen}
           onClose={() => setSearchSelectionOpen(false)}
-          onSelect={handleCountrySelect}
+          onSelect={handleSearchSelect}
         />
       </div>
     </Layout>

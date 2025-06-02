@@ -76,7 +76,11 @@ export default function LoginModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-background dark:bg-gray-900 text-foreground dark:text-gray-100 border dark:border-gray-800">
+      <DialogContent className={cn(
+        "sm:max-w-[425px] w-[95vw] max-w-[425px]",
+        "bg-background dark:bg-gray-900 text-foreground dark:text-gray-100 border dark:border-gray-800",
+        "max-h-[90vh] overflow-y-auto"
+      )}>
         <DialogHeader className="text-center">
           <div className="flex justify-center mb-2">
             <img src={logoSrc} alt="WorldMeds" className="h-16 w-auto" />
@@ -136,7 +140,7 @@ export default function LoginModal({
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         className={cn(
-                          "pl-10 bg-background dark:bg-gray-800",
+                          "pl-10 pr-10 bg-background dark:bg-gray-800",
                           "border-input dark:border-gray-700",
                           "text-foreground dark:text-gray-100"
                         )}

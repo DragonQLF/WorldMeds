@@ -78,17 +78,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isAdmin: profileResponse.data.user.role === 'admin',
               };
               
-              console.log('User authenticated with profile data:', { 
-                id: userData.id, 
-                role: userData.role, 
-                isAdmin: userData.isAdmin 
-              });
-              
-              setUser(userData);
-              
               // Connect to WebSocket for online status tracking
               connectWebSocket(token);
               startPingInterval();
+              setUser(userData);
             } else {
               // If no profile data, process the stored user
               const processedUser = {
@@ -97,17 +90,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isAdmin: storedUser.role === 'admin'
               };
               
-              console.log('Using stored user data:', { 
-                id: processedUser.id, 
-                role: processedUser.role, 
-                isAdmin: processedUser.isAdmin 
-              });
-              
-              setUser(processedUser);
-              
               // Connect to WebSocket for online status tracking
               connectWebSocket(token);
               startPingInterval();
+              setUser(processedUser);
             }
           } catch (error) {
             console.error("Token validation failed:", error);
@@ -159,11 +145,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         return true;
       } else {
-        toast({
-          variant: "destructive", 
-          title: "Login failed",
-          description: response.message || "Invalid credentials",
-        });
+        // Handle verification requirement
+        if (response.requiresVerification) {
+          toast({
+            variant: "destructive",
+            title: "Email verification required",
+            description: response.message,
+          });
+        } else {
+          toast({
+            variant: "destructive", 
+            title: "Login failed",
+            description: response.message || "Invalid credentials",
+          });
+        }
         return false;
       }
     } catch (error) {
@@ -194,18 +189,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await auth.register(registerData);
       
       if (response.success) {
-        setUser(response.user);
-        
-        // Connect to WebSocket after successful registration
-        const token = localStorage.getItem("auth_token");
-        if (token) {
-          connectWebSocket(token);
+        // Don't set user or connect WebSocket if verification is required
+        if (response.requiresVerification) {
+          toast({
+            title: "Registration successful!",
+            description: "Please check your email to verify your account before logging in.",
+          });
+        } else {
+          setUser(response.user);
+          
+          // Connect to WebSocket after successful registration
+          const token = localStorage.getItem("auth_token");
+          if (token) {
+            connectWebSocket(token);
+          }
+          
+          toast({
+            title: "Account created",
+            description: "Your account has been successfully created",
+          });
         }
-        
-        toast({
-          title: "Account created",
-          description: "Your account has been successfully created",
-        });
         return true;
       } else {
         toast({

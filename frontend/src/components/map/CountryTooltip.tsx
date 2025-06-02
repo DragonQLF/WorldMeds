@@ -98,20 +98,24 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
     pointerEvents: 'auto'
   };
   
-  // Calculate price change percentage if previous price exists
-  const calculatePriceChange = () => {
-    if (country.previousPrice && country.averagePrice) {
-      const change = ((country.averagePrice - country.previousPrice) / country.previousPrice) * 100;
+  // Calculate price change in local currency (for arrow/percent)
+  const calculateLocalPriceChange = () => {
+    // Use originalPrice (local currency) and previousPrice (local currency)
+    const orig = typeof originalPrice === 'string' ? parseFloat(originalPrice) : originalPrice;
+    const prev = typeof country.previousPrice === 'string' ? parseFloat(country.previousPrice) : country.previousPrice;
+    if (typeof orig === 'number' && typeof prev === 'number' && !isNaN(orig) && !isNaN(prev) && prev > 0) {
+      const change = ((orig - prev) / prev) * 100;
       return {
         value: change,
         increased: change > 0,
-        percentage: Math.abs(change).toFixed(1) + '%'
+        percentage: Math.abs(change).toFixed(1) + '%',
+        orig,
+        prev
       };
     }
     return null;
   };
-  
-  const priceChange = calculatePriceChange();
+  const localPriceChange = calculateLocalPriceChange();
 
   // Use package price (already converted to USD) when tooltip is shown
   useEffect(() => {
@@ -173,23 +177,6 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
   
   const countryCode = getCountryCode(country.countryName);
   
-  // Randomly assign a color for the country flag background
-  const getRandomFlagBg = () => {
-    const colors = [
-      "bg-emerald-500", "bg-blue-500", "bg-purple-500", 
-      "bg-pink-500", "bg-indigo-500", "bg-cyan-500"
-    ];
-    // Use a deterministic method since we don't have the country.countryId available here
-    const nameHash = (name: string) => {
-      let hash = 0;
-      for (let i = 0; i < name.length; i++) {
-        hash += name.charCodeAt(i);
-      }
-      return hash % colors.length;
-    };
-    return colors[nameHash(country.countryName)] || "bg-emerald-500";
-  };
-
   // Handle click on tooltip
   const handleTooltipClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -234,12 +221,12 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
       >
         {/* Flag indicator in colored square */}
         <div className="flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10">
-          <div className={`${getRandomFlagBg()} flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10 rounded-md`}>
+          <div className={`flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10 rounded-md`}>
+            {/* Use the country-flag-icons component */}
             <img 
-              src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
-              alt={`${country.countryName} flag`}
+              src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`} 
+              alt={`${country.countryName} flag`} 
               className="object-contain w-full h-full p-1"
-              onError={(e) => (e.target as HTMLImageElement).style.display = 'none'}
             />
           </div>
         </div>
@@ -253,46 +240,54 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
             {country.countryName}
           </h3>
           
-          {/* Price and medicine count */}
-          <div className="flex gap-2 sm:gap-4 items-center text-sm sm:text-base tracking-normal leading-snug mt-1">
-            {/* Price - dynamic with conversion */}
-            <div className="flex gap-1 sm:gap-1.5 items-center self-stretch">
-              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-              {country.localCurrency && originalPrice ? 
-                renderLocalPriceTooltip() : 
-                <span>{displayPrice}</span>
-              }
-              
-              {/* Price change indicator with fancy icons */}
-              {priceChange && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className={`ml-1 flex items-center ${
-                        priceChange.increased ? 'text-red-500' : 'text-emerald-500'
-                      }`}>
-                        {priceChange.increased ? (
-                          <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                        )}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      <p>
-                        {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-            
-            {/* Medicine count */}
-            <div className="flex gap-1 sm:gap-1.5 items-center self-stretch">
-              <Pill className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
-              <span>{formattedQuantity}</span>
-            </div>
+          {/* Price and medicine count - single row, arrow left, price, pill/qty */}
+          <div className="flex gap-2 items-center text-base font-medium tracking-normal leading-snug mt-1">
+            {/* Arrow or info icon, percent only on hover */}
+            {localPriceChange ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={`flex items-center ${
+                      localPriceChange.increased ? 'text-red-500' : 'text-emerald-500'
+                    }`}>
+                      {localPriceChange.increased ? (
+                        <TrendingUp className="h-5 w-5" />
+                      ) : (
+                        <TrendingDown className="h-5 w-5" />
+                      )}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    <p>
+                      {localPriceChange.increased ? 'Increased' : 'Decreased'} by {localPriceChange.percentage} (local currency)
+                    </p>
+                    <p>
+                      {`From ${formatPrice(localPriceChange.prev, country.localCurrency)} to ${formatPrice(localPriceChange.orig, country.localCurrency)}`}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center text-muted-foreground cursor-help">
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    No previous price data
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {/* Price with $ after the number, same size as arrow */}
+            <span className="font-medium text-base flex items-center">{displayPrice.replace('$', '')}$</span>
+            {/* Pill icon and quantity, font-medium, same size as price */}
+            <span className="flex items-center font-medium text-base">
+              <Pill className="h-5 w-5 mr-1 text-blue-500" />
+              {formattedQuantity}
+            </span>
           </div>
         </div>
       </section>

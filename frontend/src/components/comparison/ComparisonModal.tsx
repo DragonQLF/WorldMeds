@@ -3,9 +3,6 @@ import React from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
   DialogClose
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -51,12 +48,6 @@ export const ComparisonModal: React.FC<ComparisonModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Medicine Price Comparison</DialogTitle>
-          <DialogDescription>
-            Compare medicine prices across different countries
-          </DialogDescription>
-        </DialogHeader>
         <DialogClose className="absolute right-4 top-4" />
         <div className="overflow-auto flex-1 -mx-6 px-6">
           <ComparisonView onClose={onClose} />

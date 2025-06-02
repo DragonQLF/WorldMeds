@@ -12,7 +12,10 @@ router.post('/login', authController.login);
 // Forgot password
 router.post('/forgot-password', authController.forgotPassword);
 
-// Reset password (can be added later)
-// router.post('/reset-password', authController.resetPassword);
+// Reset password
+router.post('/reset-password', authController.resetPassword);
 
-module.exports = router; 
+// Verify email
+router.post('/verify-email', authController.verifyEmail);
+
+module.exports = router;

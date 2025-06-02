@@ -1,12 +1,8 @@
-
 import axios, { AxiosError, AxiosHeaders } from "axios";
 
 // Use the environment variable defined in the .env file
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const CURRENCY_API_URL = import.meta.env.VITE_CURRENCY_API_URL || 'https://latest.currency-api.pages.dev/v1/currencies/usd.json';
-
-console.log('Using API URL:', API_BASE_URL);
-console.log('Using Currency API URL:', CURRENCY_API_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -15,6 +11,32 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Create a separate instance for public endpoints that don't require authentication
+const publicApi = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000, // 10 seconds
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Function to format a date string to YYYY-MM-DD
+const formatDateForAPI = (dateString: string): string => {
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = ('0' + (date.getMonth() + 1)).slice(-2);
+  const day = ('0' + date.getDate()).slice(-2);
+  return `${year}-${month}-${day}`;
+};
+
+// Function to format a month string to YYYY-MM
+const formatMonthForAPI = (dateString: string): string => {
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = ('0' + (date.getMonth() + 1)).slice(-2);
+  return `${year}-${month}`;
+};
 
 // Cache for currency rates to avoid repeated API calls
 let currencyRatesCache: {
@@ -50,34 +72,26 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
   try {
     // Check if we have valid cached rates
     if (currencyRatesCache && (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION)) {
-      // console.log('Using cached currency rates (frontend)'); // Less spam
       return currencyRatesCache.rates;
     }
     
     // If no valid cache, fetch from the API
-    console.log('Fetching currency rates: Trying backend first (frontend)');
+    const response = await api.get('/currency-rates'); // This is /api/currency-rates relative to API_BASE_URL
     
-    try {
-      const backendResponse = await api.get('/currency-rates'); // This is /api/currency-rates relative to API_BASE_URL
-      if (backendResponse.data && Object.keys(backendResponse.data).length > 0) {
-        currencyRatesCache = {
-          timestamp: Date.now(),
-          rates: backendResponse.data
-        };
-        console.log('Updated currency rate cache from backend (frontend)');
-        return backendResponse.data;
-      }
-      console.warn('Backend returned no/empty data for currency rates (frontend).');
-    } catch (backendError) {
-      console.warn('Failed to fetch rates from backend, trying direct API (frontend). Error:', backendError instanceof Error ? backendError.message : backendError);
+    if (response.data && Object.keys(response.data).length > 0) {
+      currencyRatesCache = {
+        timestamp: Date.now(),
+        rates: response.data
+      };
+      return response.data;
     }
+    console.warn('Backend returned no/empty data for currency rates (frontend).');
     
-    console.log('Fetching fresh currency rates from direct API (frontend)');
-    const response = await axios.get(CURRENCY_API_URL);
+    const responseDirect = await axios.get(CURRENCY_API_URL);
     
-    if (response.data && response.data.usd) {
+    if (responseDirect.data && responseDirect.data.usd) {
       const normalizedRates: Record<string, number> = {};
-      Object.entries(response.data.usd).forEach(([key, value]) => {
+      Object.entries(responseDirect.data.usd).forEach(([key, value]) => {
         normalizedRates[key.toLowerCase()] = value as number;
       });
       
@@ -86,7 +100,6 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
         rates: normalizedRates
       };
       
-      console.log('Updated currency rate cache from direct API (frontend)');
       return normalizedRates;
     } else {
       throw new Error('Invalid response format from direct currency API (frontend)');
@@ -99,7 +112,6 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
         message: axiosError.message,
         code: axiosError.code,
         status: axiosError.response?.status,
-        // data: axiosError.response?.data, // Can be verbose
       });
       if (axiosError.response?.status === 401) {
         console.error("Received 401 Unauthorized from direct currency API. Check if API key/access changed.");
@@ -277,7 +289,7 @@ export const formatCurrencyWithSymbol = (amount: number, currency: string): stri
 // Function to get available months for the date picker
 export const getAvailableMonths = async (): Promise<string[]> => {
   try {
-    const response = await api.get('/available-months');
+    const response = await api.get('/comparison/available-months');
     if (response.data && Array.isArray(response.data)) {
       return response.data.sort((a, b) => b.localeCompare(a)); // Sort in descending order (newest first)
     }
@@ -289,6 +301,92 @@ export const getAvailableMonths = async (): Promise<string[]> => {
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return [`${year}-${month}`];
+  }
+};
+
+// --- Public API Calls (no authentication required) ---
+
+// Search countries endpoint - Using the correct backend endpoint /api/search/countries
+// and handling date filters
+export const searchCountries = async (
+  query: string,
+  filters: { month?: string | null; date?: string | null; start?: string | null; end?: string | null } = {}
+) => {
+  try {
+    const params: any = {};
+    if (query) {
+      params.q = query;
+    }
+    
+    // Add date filters if present
+    if (filters.date) {
+      params.date = formatDateForAPI(filters.date);
+    } else if (filters.month) {
+      params.month = formatMonthForAPI(filters.month);
+    } else if (filters.start) {
+        params.start = formatDateForAPI(filters.start);
+        if (filters.end) {
+            params.end = formatDateForAPI(filters.end);
+        }
+    }
+
+    const response = await publicApi.get('/search/countries', { params });
+    return response.data;
+  } catch (error) {
+    console.error('Error searching countries:', error);
+    throw error; // Re-throw to be handled by calling component
+  }
+};
+
+// Search medicines endpoint
+export const searchMedicines = async (query: string) => {
+  try {
+    const response = await publicApi.get('/search/medicines', { params: { q: query } });
+    return response.data;
+  } catch (error) {
+    console.error('Error searching medicines:', error);
+    throw error;
+  }
+};
+
+// Get all countries endpoint - also using publicApi and handling date filters
+export const getAllCountries = async (
+  filters: { month?: string | null; date?: string | null; start?: string | null; end?: string | null } = {}
+) => {
+  try {
+    // The backend /api/countries endpoint already handles month/date filtering
+    const params: any = {};
+    if (filters.date) {
+      params.date = formatDateForAPI(filters.date);
+    } else if (filters.month) {
+      params.month = formatMonthForAPI(filters.month);
+    } else if (filters.start) {
+        params.start = formatDateForAPI(filters.start);
+        if (filters.end) {
+            params.end = formatDateForAPI(filters.end);
+        }
+    }
+    
+    // Use publicApi for this endpoint as it does not require authentication
+    const response = await publicApi.get('/countries', { params });
+    
+    // The backend returns country objects with id, name, currency, averagePrice, previousPrice, medicineCount
+    // We should add iso_code to this type definition if it's returned by the backend now
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching all countries:', error);
+    throw error; // Re-throw to be handled by calling component
+  }
+};
+
+// Get all medicines endpoint - using publicApi
+export const getAllMedicines = async () => {
+  try {
+    const response = await publicApi.get('/medicines');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching all medicines:', error);
+    throw error;
   }
 };
 

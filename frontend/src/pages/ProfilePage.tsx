@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -153,7 +152,13 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="email@example.com" type="email" {...field} />
+                        <Input 
+                          placeholder="email@example.com" 
+                          type="email" 
+                          {...field} 
+                          disabled
+                          className="cursor-not-allowed opacity-90"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

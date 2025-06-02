@@ -4,12 +4,15 @@ const User = require('../models/User');
 // JWT secret for signing tokens
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Use environment variable in production
 
+console.log('Auth middleware file loaded.'); // Added logging
+console.log('JWT_SECRET is defined:', !!JWT_SECRET); // Added logging
+
 // Middleware to authenticate JWT tokens
 const authenticate = async (req, res, next) => {
   try {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ 
         success: false, 
@@ -39,8 +42,6 @@ const authenticate = async (req, res, next) => {
     // Continue to the next middleware/route handler
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ 
         success: false, 

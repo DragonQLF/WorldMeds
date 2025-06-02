@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   ComposableMap,
@@ -15,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { CountryTooltip } from "./CountryTooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import DateSlider from "./DateSlider";
 
 interface CountryData {
   countryId: string | number;
@@ -48,7 +48,7 @@ interface CurrencyRates {
 const geoUrl = "/features.json";
 
 const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
-  const { visualizationType, darkMode, selectedDate, dateRange, selectedMonth, useTimeFiltering } = useMapContext();
+  const { visualizationType, darkMode, selectedDate, dateRange, selectedMonth, useTimeFiltering, showMonthPicker } = useMapContext();
   const { isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -71,6 +71,29 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
   const frameId = useRef<number | null>(null);
   const isMoving = useRef(false);
 
+  // State for map container dimensions
+  const [mapDimensions, setMapDimensions] = useState({ width: 800, height: 600 }); // Initial dimensions
+
+  // ResizeObserver to update map dimensions
+  useEffect(() => {
+    const observer = new ResizeObserver(entries => {
+      if (entries[0]) {
+        const { width, height } = entries[0].contentRect;
+        setMapDimensions({ width, height });
+      }
+    });
+
+    if (mapContainerRef.current) {
+      observer.observe(mapContainerRef.current);
+    }
+
+    return () => {
+      if (mapContainerRef.current) {
+        observer.unobserve(mapContainerRef.current);
+      }
+    };
+  }, [mapContainerRef]);
+
   // Initialize currency exchange rates from API
   useEffect(() => {
     const loadCurrencyRates = async () => {
@@ -78,9 +101,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         // Use the fetchCurrencyRates function from api.ts
         const rates = await fetchCurrencyRates();
         setCurrencyRates(rates);
-        console.log("Currency rates loaded from API:", rates);
       } catch (error) {
-        console.error("Failed to load currency rates:", error);
         // We'll still have fallback rates from the API module
       }
     };
@@ -252,7 +273,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
     console.log("Date Range:", dateRange);
     console.log("Use Time Filtering:", useTimeFiltering);
     fetchData();
-  }, [fetchData, selectedDate, dateRange, selectedMonth, useTimeFiltering]);
+  }, [selectedDate, dateRange, selectedMonth, useTimeFiltering]);
 
   // Improved getCountryColor function for better map visualization with gradual colors
   const getCountryColor = useCallback((countryName: string) => {
@@ -270,7 +291,6 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
     let priceForComparison = country.averagePrice;
     
     if (typeof priceForComparison !== 'number' || isNaN(priceForComparison) || priceForComparison === null) {
-      console.warn(`No valid price data for ${country.countryName}`);
       return darkMode ? "#374151" : "#9ca3af"; // Gray for invalid data
     }
 
@@ -313,14 +333,14 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
     const mapElement = mapContainerRef.current;
     if (mapElement) {
       const options = { passive: true };
-      
+
       // Add passive listeners for wheel and touch events
       mapElement.addEventListener('wheel', () => {}, options);
       mapElement.addEventListener('touchstart', () => {}, options);
       mapElement.addEventListener('touchmove', () => {}, options);
       mapElement.addEventListener('touchend', () => {}, options);
     }
-    
+
     return () => {
       // Cleanup listeners on unmount
       const mapElement = mapContainerRef.current;
@@ -392,9 +412,10 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       setDetailCountryId(country.countryId);
     } else {
       // For tooltips view, toggle tooltip pin on click
-      if (event) {
-        const x = event.clientX;
-        const y = event.clientY;
+      if (event && mapContainerRef.current) {
+        const mapRect = mapContainerRef.current.getBoundingClientRect();
+        const x = event.clientX - mapRect.left;
+        const y = event.clientY - mapRect.top;
         
         // Check if this country already has a tooltip
         const existingTooltipIndex = tooltips.findIndex(
@@ -437,7 +458,14 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         (c) => c.countryName.toLowerCase() === countryName.toLowerCase()
       );
 
-      if (country) {
+      if (country && mapContainerRef.current) {
+        // Check if this country has a valid average price. If not, don't show tooltip.
+        if (typeof country.averagePrice !== 'number' || isNaN(country.averagePrice) || country.averagePrice === null) {
+          // If there was a temporary hover tooltip for this country, remove it
+          setTooltips(prev => prev.filter(t => !(t.country.countryId === country.countryId && !t.isPinned)));
+          return; // Exit if no valid price
+        }
+
         // Check if this country already has a pinned tooltip
         const hasPinnedTooltip = tooltips.some(
           t => t.country.countryId === country.countryId && t.isPinned
@@ -450,11 +478,15 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
             t => t.country.countryId === country.countryId && !t.isPinned
           );
           
+          const mapRect = mapContainerRef.current.getBoundingClientRect();
+          const x = event.clientX - mapRect.left;
+          const y = event.clientY - mapRect.top;
+
           if (existingTooltipIndex >= 0) {
             // Update existing hover tooltip
             setTooltips(prev => prev.map((tooltip, i) => 
               i === existingTooltipIndex 
-                ? { ...tooltip, x: event.clientX, y: event.clientY, visible: true }
+                ? { ...tooltip, x: x, y: y, visible: true }
                 : tooltip
             ));
           } else {
@@ -462,8 +494,8 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
             setTooltips(prev => [
               ...prev.filter(t => t.isPinned), // Keep only pinned tooltips
               { 
-                x: event.clientX, 
-                y: event.clientY, 
+                x: x,
+                y: y,
                 country, 
                 visible: true,
                 isPinned: false
@@ -544,6 +576,9 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         projectionConfig={{
           scale: 147
         }}
+        width={mapDimensions.width}
+        height={mapDimensions.height}
+        style={{ width: "100%", height: "100%" }}
       >
         <ZoomableGroup
           zoom={position.zoom}
@@ -551,6 +586,10 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
           onMoveStart={handleMoveStart}
           onMoveEnd={handleMoveEnd}
           filterZoomEvent={(evt: any) => evt.type === 'wheel' ? !evt.ctrlKey : true}
+          translateExtent={[
+            [-400, -200], // [xMin, yMin] - Adjust these values as needed
+            [2000, 1200],  // [xMax, yMax] - Adjust these values as needed
+          ]}
         >
           <Geographies geography={geoUrl}>
             {({ geographies }) =>
@@ -614,6 +653,9 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         onToggleLegend={toggleLegend}
         showLegend={showLegend}
       />
+
+      {/* Render Date Slider */}
+      <DateSlider isVisible={showMonthPicker} />
     </div>
   );
 };

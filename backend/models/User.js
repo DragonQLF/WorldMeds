@@ -6,7 +6,7 @@ class User {
   // Find a user by their ID
   static async findById(id) {
     return new Promise((resolve, reject) => {
-      const query = 'SELECT id, first_name, last_name, email, role FROM users WHERE id = ?';
+      const query = 'SELECT id, first_name, last_name, email, role, email_verified FROM users WHERE id = ?';
       db.query(query, [id], (err, results) => {
         if (err) return reject(err);
         
@@ -14,7 +14,6 @@ class User {
           return resolve(null);
         }
         
-        // Format the user object to match our expected format
         const user = {
           id: results[0].id,
           first_name: results[0].first_name,
@@ -22,7 +21,8 @@ class User {
           firstName: results[0].first_name,
           lastName: results[0].last_name,
           email: results[0].email,
-          role: results[0].role || 'user'
+          role: results[0].role || 'user',
+          email_verified: results[0].email_verified || false
         };
         
         resolve(user);
@@ -41,7 +41,38 @@ class User {
           return resolve(null);
         }
         
-        // Return full user data including password (for authentication)
+        resolve(results[0]);
+      });
+    });
+  }
+
+  // Find user by verification token
+  static async findByVerificationToken(token) {
+    return new Promise((resolve, reject) => {
+      const query = 'SELECT * FROM users WHERE verification_token = ? AND email_verified = false';
+      db.query(query, [token], (err, results) => {
+        if (err) return reject(err);
+        
+        if (results.length === 0) {
+          return resolve(null);
+        }
+        
+        resolve(results[0]);
+      });
+    });
+  }
+
+  // Find user by password reset token
+  static async findByPasswordResetToken(token) {
+    return new Promise((resolve, reject) => {
+      const query = 'SELECT * FROM users WHERE password_reset_token = ? AND password_reset_expires > NOW()';
+      db.query(query, [token], (err, results) => {
+        if (err) return reject(err);
+        
+        if (results.length === 0) {
+          return resolve(null);
+        }
+        
         resolve(results[0]);
       });
     });
@@ -51,17 +82,23 @@ class User {
   static async create(userData) {
     return new Promise(async (resolve, reject) => {
       try {
-        // Hash the password
         const hashedPassword = await bcrypt.hash(userData.password, 10);
         
-        const query = 'INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)';
+        const query = `INSERT INTO users (first_name, last_name, email, password, verification_token, email_verified) 
+                       VALUES (?, ?, ?, ?, ?, ?)`;
         db.query(
           query,
-          [userData.first_name, userData.last_name, userData.email, hashedPassword],
+          [
+            userData.first_name, 
+            userData.last_name, 
+            userData.email, 
+            hashedPassword,
+            userData.verification_token || null,
+            userData.email_verified || false
+          ],
           (err, result) => {
             if (err) return reject(err);
             
-            // Get the user we just created
             this.findById(result.insertId)
               .then(user => resolve(user))
               .catch(err => reject(err));
@@ -73,10 +110,47 @@ class User {
     });
   }
 
+  // Verify email
+  static async verifyEmail(userId) {
+    return new Promise((resolve, reject) => {
+      const query = 'UPDATE users SET email_verified = true, verification_token = NULL WHERE id = ?';
+      db.query(query, [userId], (err) => {
+        if (err) return reject(err);
+        resolve(true);
+      });
+    });
+  }
+
+  // Set password reset token
+  static async setPasswordResetToken(userId, token, expiry) {
+    return new Promise((resolve, reject) => {
+      const query = 'UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?';
+      db.query(query, [token, expiry, userId], (err) => {
+        if (err) return reject(err);
+        resolve(true);
+      });
+    });
+  }
+
+  // Reset password
+  static async resetPassword(userId, newPassword) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const query = 'UPDATE users SET password = ?, password_reset_token = NULL, password_reset_expires = NULL WHERE id = ?';
+        db.query(query, [hashedPassword, userId], (err) => {
+          if (err) return reject(err);
+          resolve(true);
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
   // Update user profile
   static async updateProfile(userId, userData) {
     return new Promise((resolve, reject) => {
-      // Build the query dynamically based on what fields are being updated
       let query = 'UPDATE users SET ';
       const queryParams = [];
       const updates = [];
@@ -96,7 +170,6 @@ class User {
         queryParams.push(userData.email);
       }
       
-      // If there's nothing to update
       if (updates.length === 0) {
         return resolve(null);
       }
@@ -107,7 +180,6 @@ class User {
       db.query(query, queryParams, (err) => {
         if (err) return reject(err);
         
-        // Get the updated user
         this.findById(userId)
           .then(user => resolve(user))
           .catch(err => reject(err));
@@ -115,11 +187,9 @@ class User {
     });
   }
 
-  // Change user password
   static async changePassword(userId, currentPassword, newPassword) {
     return new Promise(async (resolve, reject) => {
       try {
-        // First get the user to verify current password
         const query = 'SELECT password FROM users WHERE id = ?';
         db.query(query, [userId], async (err, results) => {
           if (err) return reject(err);
@@ -128,16 +198,13 @@ class User {
             return reject(new Error('User not found'));
           }
           
-          // Verify current password
           const passwordMatch = await bcrypt.compare(currentPassword, results[0].password);
           if (!passwordMatch) {
             return reject(new Error('Current password is incorrect'));
           }
           
-          // Hash new password
           const hashedPassword = await bcrypt.hash(newPassword, 10);
           
-          // Update the password
           const updateQuery = 'UPDATE users SET password = ? WHERE id = ?';
           db.query(updateQuery, [hashedPassword, userId], (err) => {
             if (err) return reject(err);

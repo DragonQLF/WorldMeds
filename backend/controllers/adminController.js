@@ -527,10 +527,11 @@ exports.getAllCountries = async (req, res) => {
         c.id, 
         c.name, 
         c.currency,
+        c.iso_code,
         COUNT(DISTINCT mc.medicine_id) AS medicineCount
       FROM countries c
       LEFT JOIN medicine_countries mc ON c.id = mc.country_id
-      GROUP BY c.id, c.name, c.currency
+      GROUP BY c.id, c.name, c.currency, c.iso_code
       ORDER BY c.name ASC
     `;
     

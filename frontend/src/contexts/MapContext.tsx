@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { format, parseISO } from "date-fns";
@@ -166,3 +165,5 @@ export function MapProvider({ children }: { children: ReactNode }) {
     </MapContext.Provider>
   );
 }
+
+export { MapContext };

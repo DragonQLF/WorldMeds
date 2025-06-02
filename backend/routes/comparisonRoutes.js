@@ -1,158 +1,461 @@
-
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { formatPrice } = require("../utils/priceUtils");
 
-// Get all medicines for the comparison dropdown
-router.get("/medicines", (req, res) => {
+// Helper function to format dates consistently
+const formatDateForQuery = (dateString) => {
+  if (!dateString) return null;
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+    return date.toISOString().split('T')[0];
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return null;
+  }
+};
+
+// Get available months for the date picker
+router.get("/available-months", (req, res) => {
   const sql = `
-    SELECT 
-      id,
-      name,
-      dosage as active_ingredient
-    FROM medicines
-    ORDER BY name
+    SELECT DISTINCT DATE_FORMAT(month, '%Y-%m') as month
+    FROM medicine_countries
+    WHERE month IS NOT NULL
+    ORDER BY month DESC
   `;
   
   db.query(sql, (err, results) => {
     if (err) {
-      console.error("Error fetching medicines for comparison:", err);
+      console.error("Error fetching available months:", err);
       return res.status(500).json({ error: "Database error" });
     }
     
-    res.json(results);
+    const months = results.map(row => row.month);
+    res.json(months);
   });
 });
 
-// Get all countries for the comparison selection
+// Search countries endpoint - FIXED: proper filtering and parameter handling
 router.get("/countries", (req, res) => {
-  const sql = `
-    SELECT 
-      id,
-      name,
-      currency
-    FROM countries
-    ORDER BY name
-  `;
+  console.log('[REQ] /api/comparison/countries', { query: req.query, body: req.body });
   
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Error fetching countries for comparison:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    
-    res.json(results);
-  });
-});
+  const { q, month, date, medicines, countries } = req.query;
+  
+  // Build the main WHERE clause
+  let mainWhereConditions = [];
+  let mainParams = [];
 
-// Get countries that have data for specific medicines
-router.get("/available-countries", (req, res) => {
-  const { medicineIds } = req.query;
-  
-  if (!medicineIds) {
-    return res.status(400).json({ error: "Medicine IDs are required" });
+  // Add country name search filter
+  if (q && q.trim()) {
+    mainWhereConditions.push("c.name LIKE ?");
+    mainParams.push(`%${q.trim()}%`);
   }
   
-  // Parse medicine IDs from comma-separated string
-  const medIds = medicineIds.split(",");
+  // Add country ID filter (if provided)
+  if (countries) {
+      const countryIds = countries.split(',').filter(id => id.trim());
+      if (countryIds.length > 0) {
+        const placeholders = countryIds.map(() => '?').join(',');
+        mainWhereConditions.push(`c.id IN (${placeholders})`);
+        mainParams.push(...countryIds);
+      }
+  }
+
+  // Add filter for countries that have the selected medicines in the selected time period
+  if (medicines) {
+    const medicineIds = medicines.split(',').filter(id => id.trim());
+    if (medicineIds.length > 0) {
+      const placeholders = medicineIds.map(() => '?').join(',');
+      
+      let medicineCountrySubqueryConditions = [`mc.medicine_id IN (${placeholders})`];
+      let medicineCountrySubqueryparams = [...medicineIds];
+
+       // Add date filtering to the subquery
+      if (month && month !== 'all') {
+        medicineCountrySubqueryConditions.push("DATE_FORMAT(mc.month, '%Y-%m') = ?");
+        medicineCountrySubqueryparams.push(month);
+      } else if (date) {
+        const formattedDate = formatDateForQuery(date);
+        if (formattedDate) {
+          medicineCountrySubqueryConditions.push("DATE(mc.month) = ?");
+          medicineCountrySubqueryparams.push(formattedDate);
+        }
+      }
+
+      const medicineCountrySubqueryWhere = medicineCountrySubqueryConditions.length > 0 
+        ? `WHERE ${medicineCountrySubqueryConditions.join(' AND ')}` : '';
+
+      mainWhereConditions.push(`c.id IN (SELECT DISTINCT mc.country_id FROM medicine_countries mc ${medicineCountrySubqueryWhere})`);
+      mainParams.push(...medicineCountrySubqueryparams);
+    }
+  }
   
-  // Use a more efficient query to find countries that have ALL selected medicines
-  const placeholders = medIds.map(() => "?").join(",");
+  const finalWhereClause = mainWhereConditions.length > 0 ? `WHERE ${mainWhereConditions.join(' AND ')}` : '';
+  const finalParams = mainParams;
+
   const sql = `
     SELECT 
-      c.id,
-      c.name,
-      c.currency
+      c.id, 
+      c.name, 
+      c.currency,
+      (
+        SELECT AVG(COALESCE(mc.sale_price, mc.reference_price))
+        FROM medicine_countries mc
+        WHERE mc.country_id = c.id
+        ${dateFilter}
+        ${medicineFilter}
+      ) AS averagePrice,
+      (
+        SELECT COUNT(DISTINCT mc.medicine_id)
+        FROM medicine_countries mc
+        WHERE mc.country_id = c.id
+        ${dateFilter}
+        ${medicineFilter}
+      ) AS totalMedicines
     FROM countries c
-    WHERE c.id IN (
-      SELECT mc.country_id
-      FROM medicine_countries mc
-      WHERE mc.medicine_id IN (${placeholders})
-      GROUP BY mc.country_id
-      HAVING COUNT(DISTINCT mc.medicine_id) = ?
-    )
+    ${finalWhereClause}
+    ORDER BY c.name
+    LIMIT 20
+  `;
+  
+  // Parameters for the subqueries (averagePrice and totalMedicines)
+  // These need the date and medicine parameters
+  let subqueryParams = [];
+   // Add date and medicine params for the AVG subquery
+  if (month && month !== 'all') {
+    subqueryParams.push(month);
+  } else if (date) {
+    const formattedDate = formatDateForQuery(date);
+    if (formattedDate) {
+      subqueryParams.push(formattedDate);
+    }
+  }
+  if (medicines) {
+      const medicineIds = medicines.split(',').filter(id => id.trim());
+       if (medicineIds.length > 0) {
+            subqueryParams.push(...medicineIds);
+       }
+  }
+
+  // Add date and medicine params again for the COUNT subquery
+   if (month && month !== 'all') {
+    subqueryParams.push(month);
+  } else if (date) {
+    const formattedDate = formatDateForQuery(date);
+    if (formattedDate) {
+      subqueryParams.push(formattedDate);
+    }
+  }
+  if (medicines) {
+      const medicineIds = medicines.split(',').filter(id => id.trim());
+       if (medicineIds.length > 0) {
+            subqueryParams.push(...medicineIds);
+       }
+  }
+
+  // Combine main query parameters with subquery parameters
+  const allParams = [...finalParams, ...subqueryParams];
+
+  console.log('Executing SQL for /countries:', sql);
+  console.log('Parameters for /countries:', allParams);
+
+  db.query(sql, allParams, (err, results) => {
+    if (err) {
+      console.error("Error searching countries:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    
+    const formattedResults = results.map(row => ({
+      id: row.id,
+      name: row.name,
+      currency: row.currency,
+      averagePrice: row.averagePrice ? parseFloat(row.averagePrice) : null,
+      totalMedicines: parseInt(row.totalMedicines) || 0
+    }));
+    
+    res.json(formattedResults);
+  });
+});
+
+// Search medicines endpoint - FIXED: proper filtering and parameter handling
+router.get("/medicines", (req, res) => {
+  const { q, countries, medicines, month, date, start, end } = req.query; // Added date/month params
+  let whereClause = "";
+  let params = [];
+  
+  // Build WHERE clause for medicine name/dosage search
+  if (q && q.trim()) {
+    whereClause = "WHERE m.name LIKE ? OR m.dosage LIKE ?";
+    params.push(`%${q.trim()}%`, `%${q.trim()}%`);
+  }
+  
+  // Build date filter for medicine filtering
+  let dateFilter = "";
+  let dateParams = [];
+   if (month && month !== 'all') {
+    dateFilter = "AND DATE_FORMAT(mc.month, '%Y-%m') = ?";
+    dateParams.push(month);
+  } else if (date) {
+    const formattedDate = formatDateForQuery(date);
+    if (formattedDate) {
+      dateFilter = "AND DATE(mc.month) = ?";
+      dateParams.push(formattedDate);
+    }
+  } else if (start && end) {
+    const formattedStart = formatDateForQuery(start);
+    const formattedEnd = formatDateForQuery(end);
+    if (formattedStart && formattedEnd) {
+      dateFilter = "AND mc.month BETWEEN ? AND ?";
+      dateParams.push(`${formattedStart}-01`, `${formattedEnd}-01`); // Assuming month is stored as YYYY-MM-DD, use the first day of the month
+    } else if (formattedStart) { // Handle case with only start date for range
+        dateFilter = "AND mc.month >= ?";
+        dateParams.push(`${formattedStart}-01`);
+    }
+  }
+  
+  // Build country filter
+  if (countries) {
+    const countryIds = countries.split(',').filter(id => id.trim());
+    if (countryIds.length > 0) {
+      const placeholders = countryIds.map(() => '?').join(',');
+      const countryWhereClause = `m.id IN (
+        SELECT DISTINCT mc.medicine_id 
+        FROM medicine_countries mc 
+        WHERE mc.country_id IN (${placeholders}) ${dateFilter}
+      )`;
+      
+      if (whereClause) {
+        whereClause += ` AND ${countryWhereClause}`;
+        params.push(...countryIds);
+      } else {
+        whereClause = `WHERE ${countryWhereClause}`;
+        params = countryIds;
+      }
+      // Add date params for the subquery if present
+      if (dateParams.length > 0) {
+          params.push(...dateParams);
+      }
+    }
+  }
+
+  // Build medicine filter (for excluding already selected medicines)
+  if (medicines) {
+    const medicineIds = medicines.split(',').filter(id => id.trim());
+    if (medicineIds.length > 0) {
+      const placeholders = medicineIds.map(() => '?').join(',');
+      const medicineWhereClause = `m.id NOT IN (${placeholders})`; // Use NOT IN for excluding
+      
+      if (whereClause) {
+        whereClause += ` AND ${medicineWhereClause}`;
+        params.push(...medicineIds);
+      } else {
+        whereClause = `WHERE ${medicineWhereClause}`;
+        params = medicineIds;
+      }
+    }
+  }
+  
+  const sql = `
+    SELECT 
+      m.id,
+      m.name,
+      m.dosage,
+      (
+        SELECT AVG(COALESCE(mc.sale_price, mc.reference_price))
+        FROM medicine_countries mc
+        WHERE mc.medicine_id = m.id
+      ) AS averagePrice,
+      (
+        SELECT COUNT(DISTINCT mc.country_id)
+        FROM medicine_countries mc
+        WHERE mc.medicine_id = m.id
+      ) AS countryCount
+    FROM medicines m
+    ${whereClause}
+    ORDER BY m.name
+    LIMIT 20
+  `;
+  
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Error searching medicines:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    
+    const formattedResults = results.map(row => ({
+      id: row.id,
+      name: row.name,
+      dosage: row.dosage,
+      averagePrice: row.averagePrice ? parseFloat(row.averagePrice) : null,
+      countryCount: parseInt(row.countryCount) || 0
+    }));
+    
+    res.json(formattedResults);
+  });
+});
+
+// Get all countries endpoint - FIXED: using COALESCE for price handling
+router.get("/all-countries", (req, res) => {
+  const { month, date } = req.query;
+  
+  // Build date filter for subqueries
+  let dateFilter = "";
+  let params = [];
+  
+  if (month && month !== 'all') {
+    dateFilter = "AND DATE_FORMAT(mc.month, '%Y-%m') = ?";
+    params.push(month, month); // Two subqueries need the month parameter
+  } else if (date) {
+    const formattedDate = formatDateForQuery(date);
+    if (formattedDate) {
+      dateFilter = "AND DATE(mc.month) = ?";
+      params.push(formattedDate, formattedDate); // Two subqueries need the date parameter
+    }
+  }
+  
+  const sql = `
+    SELECT 
+      c.id, 
+      c.name, 
+      c.currency,
+      (
+        SELECT AVG(COALESCE(mc.sale_price, mc.reference_price))
+        FROM medicine_countries mc
+        WHERE mc.country_id = c.id
+        ${dateFilter}
+      ) AS averagePrice,
+      (
+        SELECT COUNT(DISTINCT mc.medicine_id)
+        FROM medicine_countries mc
+        WHERE mc.country_id = c.id
+      ) AS totalMedicines
+    FROM countries c
     ORDER BY c.name
   `;
   
-  db.query(sql, [...medIds, medIds.length], (err, results) => {
+  db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching available countries:", err);
+      console.error("Error fetching all countries:", err);
       return res.status(500).json({ error: "Database error" });
     }
     
-    res.json(results);
+    const formattedResults = results.map(row => ({
+      id: row.id,
+      name: row.name,
+      currency: row.currency,
+      averagePrice: row.averagePrice ? parseFloat(row.averagePrice) : null,
+      totalMedicines: parseInt(row.totalMedicines) || 0
+    }));
+    
+    res.json(formattedResults);
   });
 });
 
-// Get comparison data for specific medicine(s) across countries
-router.get("/data", (req, res) => {
-  const { medicineIds, countries, mode } = req.query;
+// Get all medicines endpoint - FIXED: using COALESCE for price handling
+router.get("/all-medicines", (req, res) => {
+  const sql = `
+    SELECT 
+      m.id,
+      m.name,
+      m.dosage,
+      (
+        SELECT AVG(COALESCE(mc.sale_price, mc.reference_price))
+        FROM medicine_countries mc
+        WHERE mc.medicine_id = m.id
+      ) AS averagePrice,
+      (
+        SELECT COUNT(DISTINCT mc.country_id)
+        FROM medicine_countries mc
+        WHERE mc.medicine_id = m.id
+      ) AS countryCount
+    FROM medicines m
+    ORDER BY m.name
+  `;
   
-  if (!medicineIds) {
-    return res.status(400).json({ error: "Medicine ID is required" });
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching all medicines:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    
+    const formattedResults = results.map(row => ({
+      id: row.id,
+      name: row.name,
+      dosage: row.dosage,
+      averagePrice: row.averagePrice ? parseFloat(row.averagePrice) : null,
+      countryCount: parseInt(row.countryCount) || 0
+    }));
+    
+    res.json(formattedResults);
+  });
+});
+
+// Add the comparison endpoint that was missing
+router.get("/compare", (req, res) => {
+  const { medicines, countries, month, date } = req.query;
+  
+  if (!medicines && !countries) {
+    return res.status(400).json({ error: "At least one medicine or country must be specified" });
   }
   
-  // Parse medicine IDs and countries from comma-separated strings
-  const medIds = medicineIds.split(",");
-  const countryIds = countries ? countries.split(",") : [];
-  const comparisonMode = mode || "medicine"; // Default to medicine comparison mode
+  let whereConditions = [];
+  let params = [];
   
-  let sql, params;
+  // Build filters
+  if (medicines) {
+    const medicineIds = medicines.split(',').filter(id => id.trim());
+    if (medicineIds.length > 0) {
+      const placeholders = medicineIds.map(() => '?').join(',');
+      whereConditions.push(`mc.medicine_id IN (${placeholders})`);
+      params.push(...medicineIds);
+    }
+  }
   
-  if (comparisonMode === "medicine" || countryIds.length > 1) {
-    // Compare medicine(s) across multiple countries
-    sql = `
-      SELECT 
-        c.id AS countryId,
-        c.name AS country,
-        c.currency,
-        m.id AS medicineId,
-        m.name AS medicine,
-        m.dosage AS activeIngredient,
-        mc.sale_price AS price,
-        mc.month,
-        mc.pills_per_package
-      FROM medicine_countries mc
-      JOIN countries c ON mc.country_id = c.id
-      JOIN medicines m ON mc.medicine_id = m.id
-      WHERE mc.medicine_id IN (?)
-    `;
-    
-    params = [medIds];
-    
+  if (countries) {
+    const countryIds = countries.split(',').filter(id => id.trim());
     if (countryIds.length > 0) {
-      sql += ` AND c.id IN (?)`;
-      params.push(countryIds);
-    }
-  } else if (comparisonMode === "country" && countryIds.length === 1) {
-    // Compare multiple medicines within a single country
-    sql = `
-      SELECT 
-        c.id AS countryId,
-        c.name AS country,
-        c.currency,
-        m.id AS medicineId,
-        m.name AS medicine,
-        m.dosage AS activeIngredient,
-        mc.sale_price AS price,
-        mc.month,
-        mc.pills_per_package
-      FROM medicine_countries mc
-      JOIN medicines m ON mc.medicine_id = m.id
-      JOIN countries c ON mc.country_id = c.id
-      WHERE c.id = ?
-    `;
-    
-    params = [countryIds[0]];
-    
-    if (medIds.length > 0) {
-      sql += ` AND mc.medicine_id IN (?)`;
-      params.push(medIds);
+      const placeholders = countryIds.map(() => '?').join(',');
+      whereConditions.push(`mc.country_id IN (${placeholders})`);
+      params.push(...countryIds);
     }
   }
   
-  sql += ` ORDER BY mc.month DESC, m.name`;
+  // Build date filter
+  if (month && month !== 'all') {
+    whereConditions.push("DATE_FORMAT(mc.month, '%Y-%m') = ?");
+    params.push(month);
+  } else if (date) {
+    const formattedDate = formatDateForQuery(date);
+    if (formattedDate) {
+      whereConditions.push("DATE(mc.month) = ?");
+      params.push(formattedDate);
+    }
+  }
+  
+  const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+  
+  const sql = `
+    SELECT 
+      m.id as medicine_id,
+      m.name as medicine_name,
+      m.dosage,
+      c.id as country_id,
+      c.name as country_name,
+      c.currency,
+      mc.month,
+      COALESCE(mc.sale_price, mc.reference_price) as price,
+      mc.quantity_purchased,
+      mc.pills_per_package
+    FROM medicine_countries mc
+    JOIN medicines m ON mc.medicine_id = m.id
+    JOIN countries c ON mc.country_id = c.id
+    ${whereClause}
+    ORDER BY m.name, c.name, mc.month DESC
+  `;
   
   db.query(sql, params, (err, results) => {
     if (err) {
@@ -160,52 +463,20 @@ router.get("/data", (req, res) => {
       return res.status(500).json({ error: "Database error" });
     }
     
-    // Group results to build response data
-    const responseData = [];
-    const groupedData = {};
+    const formattedResults = results.map(row => ({
+      medicineId: row.medicine_id,
+      medicineName: row.medicine_name,
+      dosage: row.dosage,
+      countryId: row.country_id,
+      countryName: row.country_name,
+      currency: row.currency,
+      month: row.month,
+      price: row.price ? parseFloat(row.price) : null,
+      quantity: parseInt(row.quantity_purchased) || 0,
+      pillsPerPackage: parseInt(row.pills_per_package) || 1
+    }));
     
-    // Handle case where results might be empty
-    if (!results || results.length === 0) {
-      return res.json([]);
-    }
-    
-    results.forEach(row => {
-      const key = comparisonMode === "medicine" ? 
-        `country_${row.countryId}_medicine_${row.medicineId}` : 
-        `medicine_${row.medicineId}_country_${row.countryId}`;
-      
-      if (!groupedData[key]) {
-        groupedData[key] = {
-          countryId: row.countryId,
-          country: row.country,
-          medicineId: row.medicineId,
-          medicine: row.medicine,
-          activeIngredient: row.activeIngredient,
-          currency: row.currency,
-          price: row.price,
-          pillsPerPackage: row.pills_per_package,
-          trendData: []
-        };
-      }
-      
-      const month = new Date(row.month).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      
-      // Add to trend data if not already added for this month
-      const existingMonth = groupedData[key].trendData.find(item => item.month === month);
-      if (!existingMonth) {
-        groupedData[key].trendData.push({
-          month,
-          price: formatPrice(row.price)
-        });
-      }
-    });
-    
-    // Convert to array format
-    Object.values(groupedData).forEach(item => {
-      responseData.push(item);
-    });
-    
-    res.json(responseData);
+    res.json(formattedResults);
   });
 });
 

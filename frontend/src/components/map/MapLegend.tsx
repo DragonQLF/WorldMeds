@@ -1,4 +1,3 @@
-
 import React from "react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
@@ -22,8 +21,8 @@ export const MapLegend: React.FC<MapLegendProps> = ({
   return (
     <div 
       className={cn(
-        "absolute bottom-4 left-4 p-3 rounded-lg shadow-lg z-10",
-        "w-56 sm:w-60 md:w-64 transform transition-all duration-300",
+        "absolute bottom-2 left-2 p-2 rounded-md shadow-lg z-10",
+        "w-auto max-w-[180px] sm:max-w-xs md:w-64 transform transition-all duration-300",
         "max-h-[calc(100vh-32px)] overflow-y-auto",
         darkMode ? "bg-gray-800/90 text-white scrollbar-dark" : "bg-white/90 text-gray-800 scrollbar-light"
       )}
@@ -43,37 +42,37 @@ export const MapLegend: React.FC<MapLegendProps> = ({
         )}
       </div>
       
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 sm:space-y-1">
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#10b981" : "#34d399" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#10b981" : "#34d399" }}></div>
           <span className="text-xs">Much cheaper (&lt; 70% of global avg.)</span>
         </div>
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#059669" : "#6ee7b7" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#059669" : "#6ee7b7" }}></div>
           <span className="text-xs">Cheaper (70-85% of global avg.)</span>
         </div>
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#047857" : "#a7f3d0" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#047857" : "#a7f3d0" }}></div>
           <span className="text-xs">Slightly cheaper (85-95% of global avg.)</span>
         </div>
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#ca8a04" : "#fcd34d" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#ca8a04" : "#fcd34d" }}></div>
           <span className="text-xs">Average price (95-105% of global avg.)</span>
         </div>
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#b91c1c" : "#fca5a5" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#b91c1c" : "#fca5a5" }}></div>
           <span className="text-xs">Slightly more expensive (105-115% of global avg.)</span>
         </div>
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#dc2626" : "#f87171" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#dc2626" : "#f87171" }}></div>
           <span className="text-xs">More expensive (115-130% of global avg.)</span>
         </div>
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#ef4444" : "#ef4444" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#ef4444" : "#ef4444" }}></div>
           <span className="text-xs">Much more expensive (&gt; 130% of global avg.)</span>
         </div>
         <div className="flex items-center">
-          <div className="w-5 h-5 rounded mr-2" style={{ backgroundColor: darkMode ? "#374151" : "#9ca3af" }}></div>
+          <div className="w-5 h-5 sm:w-4 sm:h-4 rounded mr-2 sm:mr-1" style={{ backgroundColor: darkMode ? "#374151" : "#9ca3af" }}></div>
           <span className="text-xs">No data available</span>
         </div>
       </div>

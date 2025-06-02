@@ -1,4 +1,3 @@
-
 import { api } from "./api";
 
 interface LoginCredentials {
@@ -44,7 +43,6 @@ export const auth = {
 
   async register(data: RegisterCredentials) {
     try {
-      // Only send the exact required fields
       const requestData = {
         first_name: data.first_name,
         last_name: data.last_name,
@@ -52,9 +50,7 @@ export const auth = {
         password: data.password
       };
       
-      console.log("Sending registration data to backend:", requestData);
       const response = await api.post("/signup", requestData);
-      console.log("Registration response from backend:", response.data);
       
       if (response.data.success) {
         localStorage.setItem("auth_token", response.data.token);
@@ -72,7 +68,6 @@ export const auth = {
 
   async updateProfile(data: ProfileUpdateData) {
     try {
-      // Convert camelCase to snake_case for backend compatibility
       const requestData = {
         first_name: data.firstName,
         last_name: data.lastName,
@@ -109,6 +104,33 @@ export const auth = {
       return response.data;
     } catch (error: any) {
       console.error("Forgot password error:", error?.response?.data || error.message);
+
+      return {
+        success: false,
+        message: error?.response?.data?.message || "Failed to connect to server"
+      };
+    }
+  },
+
+  async resetPassword(token: string, newPassword: string) {
+    try {
+      const response = await api.post("/reset-password", { token, newPassword });
+      return response.data;
+    } catch (error: any) {
+      console.error("Reset password error:", error?.response?.data || error.message);
+      return { 
+        success: false, 
+        message: error?.response?.data?.message || "Failed to connect to server" 
+      };
+    }
+  },
+
+  async verifyEmail(token: string) {
+    try {
+      const response = await api.post("/verify-email", { token });
+      return response.data;
+    } catch (error: any) {
+      console.error("Email verification error:", error?.response?.data || error.message);
       return { 
         success: false, 
         message: error?.response?.data?.message || "Failed to connect to server" 

@@ -1,4 +1,3 @@
-
 const express = require("express");
 const db = require("./db");
 const cors = require("cors");
@@ -46,8 +45,144 @@ app.use('/api/comparison', comparisonRoutes);
 
 // Public API endpoints - No authentication required
 
+// Search endpoints (Public)
+app.get("/api/search/countries", (req, res) => {
+  console.log('[REQ] /api/search/countries', { query: req.query, body: req.body });
+  const searchTerm = req.query.q || '';
+  let dateFilter = '';
+  let params = [];
+
+  if (!searchTerm || searchTerm.length < 2) {
+    return res.json([]);
+  }
+
+  // Date/month filtering logic
+  if (req.query.date) {
+    dateFilter = `AND DATE(mc.month) = ?`;
+    params.push(req.query.date);
+  } else if (req.query.start) {
+    dateFilter = `AND DATE(mc.month) >= ?`;
+    params.push(req.query.start);
+    if (req.query.end) {
+      dateFilter += ` AND DATE(mc.month) <= ?`;
+      params.push(req.query.end);
+    }
+  } else if (req.query.month) {
+    dateFilter = `AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+    params.push(req.query.month);
+  }
+
+  const sql = `
+    SELECT 
+      c.id, 
+      c.name, 
+      c.currency,
+      (
+        SELECT AVG(mc.sale_price)
+        FROM medicine_countries mc
+        WHERE mc.country_id = c.id
+        ${dateFilter || `AND DATE_FORMAT(mc.month, '%Y-%m') = DATE_FORMAT((SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id), '%Y-%m')`}
+      ) AS averagePrice,
+      (
+        SELECT AVG(mc.sale_price)
+        FROM medicine_countries mc
+        WHERE mc.country_id = c.id
+        ${dateFilter || `AND DATE_FORMAT(mc.month, '%Y-%m') = DATE_FORMAT(DATE_SUB((SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id), INTERVAL 1 MONTH), '%Y-%m')`}
+      ) AS previousPrice,
+      (
+        SELECT COUNT(DISTINCT mc.medicine_id)
+        FROM medicine_countries mc
+        WHERE mc.country_id = c.id
+      ) AS medicineCount,
+      CASE
+          WHEN (
+              SELECT AVG(mc_current.sale_price)
+              FROM medicine_countries mc_current
+              WHERE mc_current.country_id = c.id
+              AND DATE_FORMAT(mc_current.month, '%Y-%m') = DATE_FORMAT((SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id), '%Y-%m')
+          ) > (
+              SELECT AVG(mc_prev.sale_price)
+              FROM medicine_countries mc_prev
+              WHERE mc_prev.country_id = c.id
+              AND DATE_FORMAT(mc_prev.month, '%Y-%m') = DATE_FORMAT(DATE_SUB((SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id), INTERVAL 1 MONTH), '%Y-%m')
+          ) THEN 'up'
+          WHEN (
+              SELECT AVG(mc_current.sale_price)
+              FROM medicine_countries mc_current
+              WHERE mc_current.country_id = c.id
+              AND DATE_FORMAT(mc_current.month, '%Y-%m') = DATE_FORMAT((SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id), '%Y-%m')
+          ) < (
+              SELECT AVG(mc_prev.sale_price)
+              FROM medicine_countries mc_prev
+              WHERE mc_prev.country_id = c.id
+              AND DATE_FORMAT(mc_prev.month, '%Y-%m') = DATE_FORMAT(DATE_SUB((SELECT MAX(month) FROM medicine_countries WHERE country_id = c.id), INTERVAL 1 MONTH), '%Y-%m')
+          ) THEN 'down'
+          ELSE 'stable'
+      END AS trendIndicator
+    FROM countries c
+    WHERE c.name LIKE ?
+    ORDER BY c.name
+    LIMIT 20
+  `;
+
+  // The default date filter doesn't use parameters. If a date filter is applied, the date parameters are used in two subqueries,
+  // so they need to be included twice in the parameters array.
+  let queryParams = [];
+  if (params.length > 0) {
+    // Add date parameters for the first subquery
+    queryParams = [...params];
+    // Add date parameters again for the second subquery
+    queryParams = [...queryParams, ...params];
+  }
+  // Add the search term parameter
+  queryParams.push(`%${searchTerm}%`);
+
+  db.query(sql, queryParams, (err, results) => {
+    if (err) {
+      console.error("Error searching countries:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    const formattedResults = results.map(row => ({
+      id: row.id,
+      name: row.name,
+      currency: row.currency,
+      averagePrice: row.averagePrice ? parseFloat(row.averagePrice) : null,
+      previousPrice: row.previousPrice ? parseFloat(row.previousPrice) : null,
+      medicineCount: parseInt(row.medicineCount) || 0,
+      trendIndicator: row.trendIndicator // Include the new trend indicator
+    }));
+    res.json(formattedResults);
+  });
+});
+
+app.get("/api/search/medicines", (req, res) => {
+  console.log('[REQ] /api/search/medicines', { query: req.query, body: req.body });
+  const searchTerm = req.query.q || '';
+  
+  if (!searchTerm || searchTerm.length < 2) {
+    return res.json([]);
+  }
+  
+  const sql = `
+    SELECT id, name, dosage 
+    FROM medicines 
+    WHERE name LIKE ? 
+    ORDER BY name 
+    LIMIT 20
+  `;
+  
+  db.query(sql, [`%${searchTerm}%`], (err, results) => {
+    if (err) {
+      console.error("Error searching medicines:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
+
 // NEW Endpoint to provide currency rates to the frontend
 app.get("/api/currency-rates", async (req, res) => {
+  console.log('[REQ] /api/currency-rates', { query: req.query, body: req.body });
   try {
     console.log("Backend /api/currency-rates endpoint hit");
     const rates = await fetchBackendCurrencyRates();
@@ -66,6 +201,7 @@ app.get("/api/currency-rates", async (req, res) => {
 
 // Get global average medicine price - UPDATED to convert to USD before averaging
 app.get("/api/global-average-medicine-price", async (req, res) => {
+  console.log('[REQ] /api/global-average-medicine-price', { query: req.query, body: req.body });
   try {
     // First, get all the medicine prices with their country currencies
     let sql = `
@@ -135,6 +271,7 @@ app.get("/api/global-average-medicine-price", async (req, res) => {
 
 // Get average prices for all countries with trend data
 app.get("/api/countries-average-prices", (req, res) => {
+  console.log('[REQ] /api/countries-average-prices', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.id AS countryId,
@@ -279,11 +416,13 @@ app.get("/api/countries-average-prices", (req, res) => {
 
 // Get all countries with price trend data
 app.get("/api/countries", (req, res) => {
+  console.log('[REQ] /api/countries', { query: req.query, body: req.body });
   const sql = `
     SELECT 
       c.id, 
       c.name, 
       c.currency,
+      c.iso_code,
       (
         SELECT AVG(mc.sale_price)
         FROM medicine_countries mc
@@ -325,6 +464,7 @@ app.get("/api/countries", (req, res) => {
 
 // Updated endpoint to get available months - for use with month picker
 app.get("/api/available-months", (req, res) => {
+  console.log('[REQ] /api/available-months', { query: req.query, body: req.body });
   const sql = `
     SELECT DISTINCT DATE_FORMAT(month, '%Y-%m') as available_month
     FROM medicine_countries
@@ -345,6 +485,24 @@ app.get("/api/available-months", (req, res) => {
   });
 });
 
+// Public endpoint to get all medicines (for search modal)
+app.get("/api/medicines", (req, res) => {
+  console.log('[REQ] /api/medicines', { query: req.query, body: req.body });
+  const sql = `
+    SELECT id, name, dosage
+    FROM medicines
+    ORDER BY name
+    LIMIT 100
+  `;
+  db.query(sql, [], (err, results) => {
+    if (err) {
+      console.error("Error fetching medicines:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
+
 // Use auth routes
 app.use('/api', authRoutes);
 
@@ -353,6 +511,7 @@ app.use('/api', userRoutes);
 
 // Get country average medicine price
 app.get("/api/country/:countryId/average-medicine-price", (req, res) => {
+  console.log('[REQ] /api/country/:countryId/average-medicine-price', { query: req.query, body: req.body });
   let sql = `
     SELECT AVG(avg_price) AS overall_average FROM (
       SELECT AVG(mc.sale_price) AS avg_price
@@ -396,6 +555,7 @@ app.get("/api/country/:countryId/average-medicine-price", (req, res) => {
 
 // Get country details
 app.get("/api/country/:countryId/details", (req, res) => {
+  console.log('[REQ] /api/country/:countryId/details', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.name,
@@ -440,6 +600,7 @@ app.get("/api/country/:countryId/details", (req, res) => {
 
 // Get country medicines
 app.get("/api/country/:countryId/medicines", (req, res) => {
+  console.log('[REQ] /api/country/:countryId/medicines', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.name AS country, 
@@ -484,6 +645,7 @@ app.get("/api/country/:countryId/medicines", (req, res) => {
 });
 
 app.get("/api/country/:countryId/summary", (req, res) => {
+  console.log('[REQ] /api/country/:countryId/summary', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.name AS country, 
@@ -526,6 +688,7 @@ app.get("/api/country/:countryId/summary", (req, res) => {
 
 // Get top 5 medicines for a country
 app.get("/api/country/:countryId/top-medicines", (req, res) => {
+  console.log('[REQ] /api/country/:countryId/top-medicines', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       m.name,
@@ -582,52 +745,110 @@ app.get("/api/country/:countryId/top-medicines", (req, res) => {
   });
 });
 
-// Search endpoints
-app.get("/api/search/countries", (req, res) => {
-  const searchTerm = req.query.q || '';
-  
-  if (!searchTerm || searchTerm.length < 2) {
-    return res.json([]);
-  }
-  
-  const sql = `
-    SELECT id, name 
-    FROM countries 
-    WHERE name LIKE ? 
-    ORDER BY name 
-    LIMIT 20
+// Get medicine details (with date/month/range filtering)
+app.get("/api/medicines/:medicineId", (req, res) => {
+  console.log('[REQ] /api/medicines/:medicineId', { query: req.query, body: req.body });
+  let sql = `
+    SELECT 
+      m.id, m.name, m.dosage,
+      AVG(mc.sale_price) AS avg_price,
+      SUM(mc.quantity_purchased) AS total_quantity,
+      MAX(CASE WHEN mc.sale_price IS NULL THEN 1 ELSE 0 END) AS using_reference_price,
+      c.currency
+    FROM medicine_countries mc
+    JOIN medicines m ON mc.medicine_id = m.id
+    JOIN countries c ON mc.country_id = c.id
+    WHERE m.id = ?
   `;
-  
-  db.query(sql, [`%${searchTerm}%`], (err, results) => {
+  const params = [req.params.medicineId];
+
+  if (req.query.date) {
+    sql += ` AND DATE(mc.month) = ?`;
+    params.push(req.query.date);
+  } else if (req.query.start) {
+    sql += ` AND DATE(mc.month) >= ?`;
+    params.push(req.query.start);
+    if (req.query.end) {
+      sql += ` AND DATE(mc.month) <= ?`;
+      params.push(req.query.end);
+    }
+  } else if (req.query.month) {
+    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+    params.push(req.query.month);
+  }
+
+  sql += ` GROUP BY m.id, c.currency`;
+
+  db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error searching countries:", err);
+      console.error("Error fetching medicine details:", err);
       return res.status(500).json({ error: "Database error" });
     }
-    res.json(results);
+    res.json(results[0] || null);
   });
 });
 
-app.get("/api/search/medicines", (req, res) => {
-  const searchTerm = req.query.q || '';
-  
-  if (!searchTerm || searchTerm.length < 2) {
-    return res.json([]);
-  }
-  
-  const sql = `
-    SELECT id, name, dosage 
-    FROM medicines 
-    WHERE name LIKE ? 
-    ORDER BY name 
-    LIMIT 20
+// Get countries where this medicine is available (with date/month/range filtering)
+app.get("/api/medicines/:medicineId/countries", (req, res) => {
+  console.log('[REQ] /api/medicines/:medicineId/countries', { query: req.query, body: req.body });
+  let sql = `
+    SELECT 
+      c.id, c.name, c.currency,
+      SUM(mc.quantity_purchased) AS total_quantity,
+      AVG(mc.sale_price) AS avg_price
+    FROM medicine_countries mc
+    JOIN countries c ON mc.country_id = c.id
+    WHERE mc.medicine_id = ?
   `;
-  
-  db.query(sql, [`%${searchTerm}%`], (err, results) => {
+  const params = [req.params.medicineId];
+
+  if (req.query.date) {
+    sql += ` AND DATE(mc.month) = ?`;
+    params.push(req.query.date);
+  } else if (req.query.start) {
+    sql += ` AND DATE(mc.month) >= ?`;
+    params.push(req.query.start);
+    if (req.query.end) {
+      sql += ` AND DATE(mc.month) <= ?`;
+      params.push(req.query.end);
+    }
+  } else if (req.query.month) {
+    sql += ` AND DATE_FORMAT(mc.month, '%Y-%m') = ?`;
+    params.push(req.query.month);
+  }
+
+  sql += ` GROUP BY c.id`;
+
+  db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error searching medicines:", err);
+      console.error("Error fetching medicine countries:", err);
       return res.status(500).json({ error: "Database error" });
     }
-    res.json(results);
+    // Ensure avg_price is always a number or null
+    const fixedResults = results.map(row => ({
+      ...row,
+      avg_price: row.avg_price !== null ? Number(row.avg_price) : null
+    }));
+    res.json(fixedResults);
+  });
+});
+
+// Get available months for a specific medicine
+app.get("/api/medicines/:medicineId/available-months", (req, res) => {
+  console.log('[REQ] /api/medicines/:medicineId/available-months', { query: req.query, body: req.body });
+  const sql = `
+    SELECT DISTINCT DATE_FORMAT(month, '%Y-%m') as available_month
+    FROM medicine_countries
+    WHERE medicine_id = ?
+    ORDER BY available_month DESC
+  `;
+  db.query(sql, [req.params.medicineId], (err, results) => {
+    if (err) {
+      console.error("Error fetching available months for medicine:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    const months = results.map(row => row.available_month);
+    res.json(months);
   });
 });
 

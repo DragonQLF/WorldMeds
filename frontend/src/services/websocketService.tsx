@@ -1,4 +1,3 @@
-
 // WebSocket connection management
 let socket: WebSocket | null = null;
 let onlineUsersCallback: ((count: number) => void) | null = null;
@@ -13,7 +12,6 @@ let lastPingSentTime = 0; // Track when the last ping was sent
 
 export const connectWebSocket = (token: string): void => {
   if (socket && socket.readyState === WebSocket.OPEN) {
-    console.log('WebSocket already connected. No need to reconnect.');
     return;
   }
 
@@ -41,7 +39,6 @@ export const connectWebSocket = (token: string): void => {
     socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
-      console.log('WebSocket connection established');
       // Reset reconnect attempts and ping failures on successful connection
       reconnectAttempts = 0;
       pingFailures = 0;
@@ -69,7 +66,6 @@ export const connectWebSocket = (token: string): void => {
         if (data.type === 'PONG') {
           // Calculate ping-pong round trip time
           const roundTripTime = Date.now() - lastPingSentTime;
-          console.log(`WebSocket ping-pong round trip: ${roundTripTime}ms`);
           // Pong received, connection is healthy
           pingFailures = 0;
         }
@@ -79,8 +75,6 @@ export const connectWebSocket = (token: string): void => {
     };
 
     socket.onclose = (event) => {
-      console.log('WebSocket connection closed', event.code, event.reason);
-      
       // Stop pinging
       if (pingIntervalId) {
         clearInterval(pingIntervalId);
@@ -95,14 +89,12 @@ export const connectWebSocket = (token: string): void => {
       
       // Don't attempt to reconnect if closed normally (code 1000)
       if (event.code === 1000) {
-        console.log("Clean close of WebSocket connection, not reconnecting");
         return;
       }
       
       // Try to reconnect as long as we haven't exceeded max attempts
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
-        console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
         
         // Use exponential backoff for reconnection attempts
         const backoffDelay = Math.min(RECONNECT_INTERVAL * Math.pow(1.5, reconnectAttempts - 1), 30000);
@@ -112,21 +104,16 @@ export const connectWebSocket = (token: string): void => {
             connectWebSocket(token);
           }
         }, backoffDelay);
-      } else {
-        console.log('Max reconnection attempts reached. Stopping reconnection attempts.');
       }
     };
 
     socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
       // We don't need to do anything here as onclose will be called right after
     };
   } catch (error) {
-    console.error('Error establishing WebSocket connection:', error);
     // Try to reconnect if connection fails to establish
     if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
       reconnectAttempts++;
-      console.log(`Error connecting. Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
       
       reconnectTimer = setTimeout(() => {
         if (token) {
@@ -189,7 +176,6 @@ export const sendMessage = (data: any): boolean => {
     if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
       const token = localStorage.getItem("auth_token");
       if (token) {
-        console.log('Socket is closed or closing, attempting to reconnect...');
         connectWebSocket(token);
       }
     }
@@ -208,7 +194,6 @@ export const pingServer = (): void => {
     
     // If we've had too many failures, try to reconnect
     if (pingFailures >= MAX_PING_FAILURES) {
-      console.log(`Ping failed ${pingFailures} times, attempting to reconnect WebSocket`);
       const token = localStorage.getItem("auth_token");
       if (token) {
         connectWebSocket(token);
@@ -228,7 +213,6 @@ export const startPingInterval = (intervalMs = 15000): void => {
       pingServer();
     } else if (socket && socket.readyState !== WebSocket.CONNECTING) {
       // If socket is closed or closing, try to reconnect
-      console.log('Socket not open during ping interval, trying to reconnect');
       const token = localStorage.getItem("auth_token");
       if (token) {
         connectWebSocket(token);

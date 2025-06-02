@@ -1,4 +1,3 @@
-
 # WorldMeds - Global Medicine Price Index
 
 WorldMeds is a comprehensive web application that tracks and visualizes medicine price variations across countries and regions. This tool helps users understand the financial impact of medicine prices globally and provides transparent data visualization to support informed decision-making by patients, healthcare providers, and policy makers.
@@ -21,6 +20,10 @@ The WorldMeds application allows users to:
 - **Specialized Medicine Price Index**: Monitor inflation specific to the pharmaceutical sector
 - **Detailed Country Profiles**: Access in-depth medicine pricing data for each country
 - **Search Functionality**: Find specific medicines and compare their prices globally
+- **User Profile Management**: Manage user profile information
+- **Settings**: Configure application settings
+- **Admin Dashboard**: Access administrative functionalities (for authorized users)
+- **Route Protection and Authentication**: Secure routes requiring user login and handling admin access
 
 ## Technology Stack
 
@@ -63,14 +66,10 @@ docker-compose up -d
 ```
 
 This will launch:
-- The frontend React application on port 3000
+- The frontend React application on port 8080
 - The backend API server on port 3001
 - MySQL database on port 3306
 
 ## Contributors
 
 This project is maintained by [Your Organization/Name]. Contributions are welcome through pull requests or issues.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

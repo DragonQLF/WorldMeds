@@ -271,7 +271,13 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
                             <FormItem>
                               <FormLabel>Email</FormLabel>
                               <FormControl>
-                                <Input placeholder="email@example.com" type="email" {...field} />
+                                <Input
+                                  placeholder="email@example.com"
+                                  type="email"
+                                  {...field}
+                                  disabled
+                                  className="cursor-not-allowed opacity-90"
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

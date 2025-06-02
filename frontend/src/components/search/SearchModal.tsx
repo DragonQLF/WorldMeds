@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from "react";
-import { Search, ArrowUpRight, ArrowDownRight, ArrowLeft } from "lucide-react";
+import { Search, ArrowUpRight, ArrowDownRight, ArrowLeft, TrendingUp, TrendingDown, Pill } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +13,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMapContext } from "@/contexts/MapContext";
-import { api } from "@/lib/api";
+import { api, convertToUSD } from "@/lib/api";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import FlagIcon from "@/components/flags/FlagIcon";
 
 interface SearchResult {
   id: number;
@@ -26,14 +27,16 @@ interface SearchResult {
   totalMedicines?: number;
   currency?: string;
   countryCount?: number;
+  noPriceForSelectedMonth?: boolean;
+  iso_code?: string;
   [key: string]: any;
 }
 
 interface SearchModalProps {
   type: "country" | "medicine";
   onSelect: (item: SearchResult) => void;
-  onBack?: () => void; // New prop for nested modal navigation
-  isNestedModal?: boolean; // Flag to indicate if this is a nested modal
+  onBack?: () => void; 
+  isNestedModal?: boolean; 
 }
 
 export const SearchModal: React.FC<SearchModalProps> = ({ 
@@ -44,7 +47,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 }) => {
   const [open, setOpen] = useState(isNestedModal);
   const [searchTerm, setSearchTerm] = useState("");
-  const { darkMode } = useMapContext();
+  const { darkMode, selectedDate, selectedMonth } = useMapContext();
   
   // Effect to reset open state when isNestedModal changes
   useEffect(() => {
@@ -53,49 +56,126 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [isNestedModal]);
 
+  // Helper to build date params for API
+  const getDateParam = () => {
+    if (selectedDate) {
+      return `?date=${selectedDate.toISOString().split('T')[0]}`;
+    } else if (selectedMonth && selectedMonth !== 'all') {
+      return `?month=${selectedMonth}`;
+    }
+    return '';
+  };
+
   // Query for all countries/medicines data
-  const { data: allItems = [], isLoading: isLoadingAll } = useQuery({
-    queryKey: [type, 'all-items'],
+  const { data: allItemsRaw = [], isLoading: isLoadingAll } = useQuery({
+    queryKey: [type, 'all-items', selectedDate, selectedMonth],
     queryFn: async () => {
       if (!open) return [];
-      
-      const endpoint = type === "country" 
-        ? `/countries`
-        : `/medicines`;
-      
-      try {
-        console.log(`Fetching all ${type}s data from ${endpoint}`);
-        const response = await api.get(endpoint);
-        console.log(`Received ${type}s data:`, response.data);
-        return response.data;
-      } catch (error) {
-        console.error(`Error fetching all ${type}s:`, error);
-        return [];
-      }
+      const endpoint = type === "country"
+        ? `/countries${getDateParam()}`
+        : `/medicines`; // Medicines don't need date/month param for general listing in search
+      const response = await api.get(endpoint);
+      return response.data;
     },
     enabled: open,
   });
   
+  const [allItems, setAllItems] = React.useState<SearchResult[]>([]);
+  const [convertingAll, setConvertingAll] = React.useState(false);
+
+  React.useEffect(() => {
+    if (type !== 'country' || !allItemsRaw.length) {
+      setAllItems(allItemsRaw as SearchResult[]);
+      return;
+    }
+    let cancelled = false;
+    setConvertingAll(true);
+    Promise.all(
+      allItemsRaw.map(async (item: any) => {
+        // Parse prices from string to number if needed
+        const avgLocal = typeof item.averagePrice === 'string' ? parseFloat(item.averagePrice) : item.averagePrice;
+        const prevLocal = typeof item.previousPrice === 'string' ? parseFloat(item.previousPrice) : item.previousPrice;
+        let avgUSD = avgLocal;
+        if (item.currency && item.currency !== 'USD' && typeof avgLocal === 'number' && !isNaN(avgLocal)) {
+          avgUSD = await convertToUSD(avgLocal, item.currency);
+        }
+        // Determine if there is no price for the selected month/date
+        let noPriceForSelectedMonth = false;
+        if ((selectedMonth && selectedMonth !== 'all') || selectedDate) {
+          if (avgLocal === null || avgLocal === undefined || isNaN(avgLocal)) {
+            noPriceForSelectedMonth = true;
+          }
+        }
+        // For the arrow, always use local currency values (not USD)
+        return {
+          ...item,
+          averagePrice: avgUSD, // always USD for display
+          previousPriceLocal: prevLocal, // for arrow/percent
+          averagePriceLocal: avgLocal,   // for arrow/percent
+          currency: 'USD', // for display
+          noPriceForSelectedMonth,
+        };
+      })
+    ).then((converted) => {
+      if (!cancelled) setAllItems(converted as SearchResult[]);
+      setConvertingAll(false);
+    });
+    return () => { cancelled = true; };
+  }, [allItemsRaw, type, selectedMonth, selectedDate]);
+  
   // Query for search results only when a search term is entered
-  const { data: searchResults = [], isLoading: isSearching } = useQuery({
-    queryKey: [type, 'search', searchTerm, open],
+  const { data: searchResultsRaw = [], isLoading: isSearching } = useQuery({
+    queryKey: [type, 'search', searchTerm, open, selectedDate, selectedMonth],
     queryFn: async () => {
       if (!open || !searchTerm) return [];
-      
-      const endpoint = type === "country" 
-        ? `/search/countries?q=${searchTerm}`
-        : `/search/medicines?q=${searchTerm}`;
-      
-      try {
-        const response = await api.get(endpoint);
-        return response.data;
-      } catch (error) {
-        console.error("Error searching:", error);
-        return [];
-      }
+      const endpoint = type === "country"
+        ? `/search/countries${getDateParam()}&q=${searchTerm}`
+        : `/search/medicines?q=${searchTerm}`; // Medicines don't need date/month param for search query
+      const response = await api.get(endpoint);
+      return response.data;
     },
     enabled: open && searchTerm.length >= 2,
   });
+  
+  const [searchResults, setSearchResults] = React.useState<SearchResult[]>([]);
+  const [convertingSearch, setConvertingSearch] = React.useState(false);
+
+  React.useEffect(() => {
+    if (type !== 'country' || !searchResultsRaw.length) {
+      setSearchResults(searchResultsRaw as SearchResult[]);
+      return;
+    }
+    let cancelled = false;
+    setConvertingSearch(true);
+    Promise.all(
+      searchResultsRaw.map(async (item: any) => {
+        const avgLocal = typeof item.averagePrice === 'string' ? parseFloat(item.averagePrice) : item.averagePrice;
+        const prevLocal = typeof item.previousPrice === 'string' ? parseFloat(item.previousPrice) : item.previousPrice;
+        let avgUSD = avgLocal;
+        if (item.currency && item.currency !== 'USD' && typeof avgLocal === 'number' && !isNaN(avgLocal)) {
+          avgUSD = await convertToUSD(avgLocal, item.currency);
+        }
+        let noPriceForSelectedMonth = false;
+        if ((selectedMonth && selectedMonth !== 'all') || selectedDate) {
+          if (avgLocal === null || avgLocal === undefined || isNaN(avgLocal)) {
+            noPriceForSelectedMonth = true;
+          }
+        }
+        return {
+          ...item,
+          averagePrice: avgUSD,
+          previousPriceLocal: prevLocal,
+          averagePriceLocal: avgLocal,
+          currency: 'USD',
+          noPriceForSelectedMonth,
+        };
+      })
+    ).then((converted) => {
+      if (!cancelled) setSearchResults(converted as SearchResult[]);
+      setConvertingSearch(false);
+    });
+    return () => { cancelled = true; };
+  }, [searchResultsRaw, type, selectedMonth, selectedDate]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -108,7 +188,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && onBack && isNestedModal) {
-      // If we're in a nested modal and closing, we should go back instead
       onBack();
     } else {
       setOpen(newOpen);
@@ -117,7 +196,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   
   // Determine which items to display
   const displayItems = searchTerm.length >= 2 ? searchResults : allItems;
-  const isLoading = searchTerm.length >= 2 ? isSearching : isLoadingAll;
+  const isLoading = searchTerm.length >= 2 ? (isSearching || convertingSearch) : (isLoadingAll || convertingAll);
   
   // Format price to display
   const formatPrice = (price?: number) => {
@@ -143,28 +222,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     return change;
   };
 
-  // Function to get the flag URL
-  const getCountryFlag = (countryName: string) => {
-    const countryFlags: Record<string, string> = {
-      "Argentina": "ar",
-      "Australia": "au",
-      "Brazil": "br",
-      "Canada": "ca",
-      "Chile": "cl",
-      "Mexico": "mx",
-      "Russia": "ru",
-      "USA": "us",
-      "United States": "us",
-      "South Korea": "kr",
-      "India": "in",
-      "Algeria": "dz",
-      "Angola": "ao"
-    };
-    
-    const code = countryFlags[countryName] || "un";
-    return `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
-  };
-  
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {/* Only show trigger button if not in nested modal mode */}
@@ -204,11 +261,11 @@ export const SearchModal: React.FC<SearchModalProps> = ({
               </Button>
             )}
             
-            <DialogTitle className="text-xl">
+            <DialogTitle className="text-xl text-center"> {/* Centered Title */}
               {type === "country" ? "Countries" : "Medicines"}
             </DialogTitle>
-            <DialogDescription className={darkMode ? 'text-gray-300' : 'text-gray-500'}>
-              {searchTerm.length >= 2 ? `Search results for "${searchTerm}"` : "All available items"}
+            <DialogDescription className={`${darkMode ? 'text-gray-300' : 'text-gray-500'} text-center`}> {/* Centered Description */}
+              {searchTerm.length >= 2 ? `Search results for "${searchTerm}"` : (type === "country" ? "All available items" : "Compare pharmaceutical prices worldwide")}
             </DialogDescription>
           </DialogHeader>
           
@@ -239,71 +296,129 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                     darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
                   }`}
                 >
-                  <div className="flex items-start space-x-3 max-w-[70%]">
+                  {/* Modified left section to allow text wrapping and pill count */}
+                  <div className="flex items-start space-x-3 flex-1 min-w-0 mr-2"> {/* Added flex-1, min-w-0 and mr-2 */}
                     {type === "country" && (
-                      <div className="w-10 h-6 overflow-hidden rounded shrink-0">
-                        <img 
-                          src={getCountryFlag(item.name)} 
-                          alt={`${item.name} flag`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
+                      <div className="h-5 w-auto rounded-sm shrink-0 overflow-hidden">
+                        {/* Use the new FlagIcon component */}
+                        <FlagIcon isoCode={item.iso_code} title={`${item.name} flag`} className="h-full w-full object-cover" />
                       </div>
                     )}
                     
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{item.name}</p>
+                    <div className="min-w-0 flex-1"> {/* Added flex-1 */}
+                      <p className="font-medium break-words">{item.name}</p> {/* Removed truncate, added break-words */}
                       <div className="flex items-center mt-1 text-sm flex-wrap">
-                        {item.averagePrice !== undefined ? (
+                        {typeof item.averagePrice === 'number' ? (
                           <>
-                            <span className="font-medium">${Number(item.averagePrice).toFixed(2)}</span>
-                            {item.totalMedicines !== undefined && (
+                            <span className="font-medium">{Number(item.averagePrice).toFixed(2)}</span>
+                            {/* Price change indicator */}
+                            {typeof item.previousPriceLocal === 'number' && !isNaN(item.previousPriceLocal) && typeof item.averagePriceLocal === 'number' && !isNaN(item.averagePriceLocal) ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className={`ml-2 flex items-center ${
+                                      item.averagePriceLocal < item.previousPriceLocal
+                                        ? 'text-green-500'
+                                        : item.averagePriceLocal > item.previousPriceLocal
+                                          ? 'text-red-500'
+                                          : 'text-gray-400'
+                                    }`}>
+                                      {item.averagePriceLocal < item.previousPriceLocal ? (
+                                        <TrendingDown className="h-4 w-4 mr-1" />
+                                      ) : item.averagePriceLocal > item.previousPriceLocal ? (
+                                        <TrendingUp className="h-4 w-4 mr-1" />
+                                      ) : null}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    <p>
+                                      {item.averagePriceLocal > item.previousPriceLocal
+                                        ? 'Increased'
+                                        : 'Decreased'} by {Math.abs(
+                                          ((item.averagePriceLocal - item.previousPriceLocal) / item.previousPriceLocal) * 100 || 0
+                                        ).toFixed(1)}% (local currency)
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="ml-2 text-xs text-muted-foreground flex items-center cursor-help">
+                                      <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    No previous price data
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {/* Display total medicines for countries */}
+                            {type === "country" && item.totalMedicines !== undefined && (
                               <span className="ml-2 flex items-center text-muted-foreground text-xs">
                                 •
-                                <svg className="h-3 w-3 mx-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-                                </svg>
+                                <Pill className="h-3 w-3 mx-1" /> {/* Using Pill icon */}
                                 {item.totalMedicines.toLocaleString()}
                               </span>
                             )}
+                            {/* Info for no price for selected month */}
+                            {item.noPriceForSelectedMonth && (
+                              <span className="ml-2 text-xs text-muted-foreground flex items-center">
+                                <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+                                No price for {selectedMonth || 'this date'}, using latest available
+                              </span>
+                            )}
                           </>
+                        ) : type === "country" && item.totalMedicines !== undefined ? (
+                            // Show only total medicines if no price data for country
+                            <span className="ml-0 flex items-center text-muted-foreground text-xs">
+                                <Pill className="h-3 w-3 mr-1" />
+                                {item.totalMedicines.toLocaleString()} medicines
+                            </span>
                         ) : (
                           <span className="text-muted-foreground">No price data</span>
                         )}
+                         {/* Display dosage for medicines */}
+                         {type === "medicine" && item.dosage && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                                ({item.dosage})
+                            </span>
+                         )}
                       </div>
                     </div>
                   </div>
                   
-                  {item.averagePrice !== undefined && item.previousPrice !== undefined && (
-                    <div className="flex items-center">
-                      {calculateChange(item.averagePrice, item.previousPrice) !== null && (
-                        <div className={`mr-3 flex items-center ${
-                          item.averagePrice < item.previousPrice 
-                            ? 'text-green-500' 
-                            : item.averagePrice > item.previousPrice 
-                              ? 'text-red-500' 
-                              : 'text-gray-400'
-                        }`}>
-                          {item.averagePrice < item.previousPrice ? (
-                            <ArrowDownRight className="h-4 w-4 mr-1" />
-                          ) : item.averagePrice > item.previousPrice ? (
-                            <ArrowUpRight className="h-4 w-4 mr-1" />
-                          ) : null}
-                          {Math.abs(calculateChange(item.averagePrice, item.previousPrice) || 0).toFixed(1)}%
-                        </div>
-                      )}
-                      
-                      <Switch 
-                        checked={true} 
-                        className="data-[state=checked]:bg-green-500" 
-                        aria-label={`Select ${item.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelect(item);
-                        }}
-                      />
-                    </div>
-                  )}
+                  {/* Right section with switch, kept as is but ensured it doesn't get squeezed */}
+                  <div className="flex items-center shrink-0"> {/* Added shrink-0 */}
+                    {item.averagePrice !== undefined && item.previousPrice !== undefined && calculateChange(item.averagePrice, item.previousPrice) !== null && (
+                      <div className={`mr-3 flex items-center ${
+                        item.averagePrice < item.previousPrice 
+                          ? 'text-green-500' 
+                          : item.averagePrice > item.previousPrice 
+                            ? 'text-red-500' 
+                            : 'text-gray-400'
+                      }`}>
+                        {item.averagePrice < item.previousPrice ? (
+                          <TrendingDown className="h-4 w-4 mr-1" />
+                        ) : item.averagePrice > item.previousPrice ? (
+                          <TrendingUp className="h-4 w-4 mr-1" />
+                        ) : null}
+                      </div>
+                    )}
+                    
+                    <Switch 
+                      checked={true} // This makes it always appear selected. Is this intended?
+                                     // Consider managing selection state if items can be de-selected
+                      className="data-[state=checked]:bg-green-500" 
+                      aria-label={`Select ${item.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering the outer div's onClick
+                        handleSelect(item);
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

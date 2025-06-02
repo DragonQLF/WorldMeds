@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,7 +88,13 @@ export default function Settings() {
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="flex items-center space-x-2">
-                    <Input id="email" type="email" defaultValue={user?.email} />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      defaultValue={user?.email} 
+                      disabled
+                      className="cursor-not-allowed opacity-90"
+                    />
                     <Button variant="outline">Verify Email</Button>
                   </div>
                 </div>

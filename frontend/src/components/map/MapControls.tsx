@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useRef, memo } from "react";
-import { Calendar, ZoomIn, ZoomOut, Map, Layers } from "lucide-react";
+import { Calendar, ZoomIn, ZoomOut, MapPin, BarChart2, Map, Layers, ListTree } from "lucide-react";
 import { useMapContext } from "@/contexts/MapContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import MonthPicker from "@/components/datepicker/MonthPicker";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MapControlsProps {
@@ -70,8 +68,9 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
             )}
             onClick={() => setVisualizationType("markers")}
             title="Markers View"
+            aria-label="Toggle Markers View"
           >
-            <Map className="h-4 w-4" />
+            <MapPin className="h-4 w-4" />
           </Button>
           
           <Button
@@ -83,37 +82,32 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
             )}
             onClick={() => setVisualizationType("graphs")}
             title="Detailed View"
+            aria-label="Toggle Detailed View"
           >
-            <Layers className="h-4 w-4" />
+            <BarChart2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
       
       {/* Calendar icon to trigger date picker */}
       <div className="flex p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl">
-        <Button 
-          ref={calendarButtonRef}
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className={cn(
-            controlClass, 
-            showMonthPicker ? activeClass : "",
-            "flex items-center justify-center gap-1"
+            controlClass,
+            showMonthPicker ? activeClass : "text-gray-500 dark:text-gray-400"
           )}
           onClick={toggleMonthPicker}
+          title={showMonthPicker ? "Hide Month Picker" : "Show Month Picker"}
+          aria-label={showMonthPicker ? "Hide Month Picker" : "Show Month Picker"}
+          ref={calendarButtonRef}
         >
           <Calendar className="h-4 w-4" />
-          <span className="sr-only">Select date range</span>
         </Button>
       </div>
       
       {/* Month picker popup */}
-      <MonthPicker 
-        isOpen={showMonthPicker} 
-        onClose={() => setShowMonthPicker(false)} 
-        position={isMobile ? "top" : "left"}
-        anchor={calendarButtonRef}
-      />
       
       {/* Legend Toggle */}
       {onToggleLegend && (
@@ -124,8 +118,9 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
             className={cn(controlClass, showLegend ? activeClass : "")}
             onClick={onToggleLegend}
             title={showLegend ? "Hide Legend" : "Show Legend"}
+            aria-label={showLegend ? "Toggle Legend Visibility" : "Toggle Legend Visibility"}
           >
-            <Map className="h-4 w-4" />
+            <ListTree className="h-4 w-4" />
           </Button>
         </div>
       )}
@@ -138,6 +133,7 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
             variant="ghost" 
             size="icon" 
             className={cn(controlClass, "active:scale-95")}
+            aria-label="Zoom In"
           >
             <ZoomIn className="h-3 w-3" />
           </Button>
@@ -146,6 +142,7 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
             variant="ghost" 
             size="icon" 
             className={cn(controlClass, "active:scale-95")}
+            aria-label="Zoom Out"
           >
             <ZoomOut className="h-3 w-3" />
           </Button>

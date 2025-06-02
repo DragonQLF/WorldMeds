@@ -1,4 +1,3 @@
-
 # WorldMeds Frontend
 
 This directory contains the frontend application for the WorldMeds project - a global medicine price index visualization tool.
@@ -37,6 +36,13 @@ This directory contains the frontend application for the WorldMeds project - a g
 - **Time-Based Filtering**: View data for specific time periods
 - **Price Comparison**: Compare medicine prices between countries
 - **Search Functionality**: Find specific countries or medicines
+- **User Authentication**: User login and registration
+- **Email Verification**: Verify user email addresses
+- **Forgot Password**: Functionality to reset forgotten passwords
+- **User Profile Management**: Manage user profile information
+- **Settings**: Configure application settings
+- **Admin Dashboard**: Access administrative functionalities (for authorized users)
+- **Route Protection**: Secure routes requiring user login and handling admin access
 - **Responsive Design**: Works on desktop and mobile devices
 - **Dark/Light Mode**: User-selectable theme
 
@@ -99,3 +105,12 @@ When running in Docker, the application is served by Nginx and properly configur
 - Use the Shadcn UI component library when possible
 - Implement responsive design using Tailwind CSS
 - Organize related files by feature area
+
+The project follows code conventions enforced by ESLint. You can run the linter using:
+```bash
+npm run lint
+```
+
+## Testing
+
+Automated tests are not currently implemented for the frontend.
