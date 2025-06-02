@@ -72,4 +72,4 @@ This will launch:
 
 ## Contributors
 
-This project is maintained by [Your Organization/Name]. Contributions are welcome through pull requests or issues.
+This project is maintained by WorldMeds.
