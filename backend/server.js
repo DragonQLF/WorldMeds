@@ -77,6 +77,7 @@ app.get("/api/search/countries", (req, res) => {
       c.id, 
       c.name, 
       c.currency,
+      c.iso_code,
       (
         SELECT AVG(mc.sale_price)
         FROM medicine_countries mc
@@ -146,6 +147,7 @@ app.get("/api/search/countries", (req, res) => {
       id: row.id,
       name: row.name,
       currency: row.currency,
+      iso_code: row.iso_code,
       averagePrice: row.averagePrice ? parseFloat(row.averagePrice) : null,
       previousPrice: row.previousPrice ? parseFloat(row.previousPrice) : null,
       medicineCount: parseInt(row.medicineCount) || 0,
@@ -277,6 +279,7 @@ app.get("/api/countries-average-prices", (req, res) => {
       c.id AS countryId,
       c.name AS countryName,
       c.currency AS localCurrency,
+      c.iso_code,
       (
         SELECT AVG(sub.avg_price)
         FROM (
@@ -395,22 +398,20 @@ app.get("/api/countries-average-prices", (req, res) => {
     
     // Process the results, ensure we use package prices consistently
     // but don't do the currency conversion here - we'll do it on the frontend
-    for (let i = 0; i < results.length; i++) {
-      const country = results[i];
-      
-      // Make sure prices aren't null
-      if (country.averagePrice === null) country.averagePrice = 0;
-      if (country.originalPrice === null) country.originalPrice = 0;
-      if (country.previousPrice === null) country.previousPrice = 0;
-      
-      // Format all prices to avoid inconsistent decimal places
-      country.averagePrice = formatPrice(country.averagePrice);
-      country.originalPrice = formatPrice(country.originalPrice);
-      country.previousPrice = formatPrice(country.previousPrice);
-    }
+    const formattedResults = results.map(country => ({
+      countryId: country.countryId,
+      countryName: country.countryName,
+      localCurrency: country.localCurrency,
+      iso_code: country.iso_code,
+      averagePrice: country.averagePrice === null ? 0 : parseFloat(country.averagePrice),
+      originalPrice: country.originalPrice === null ? 0 : parseFloat(country.originalPrice),
+      previousPrice: country.previousPrice === null ? 0 : parseFloat(country.previousPrice),
+      totalMedicines: parseInt(country.totalMedicines) || 0,
+      pillsPerPackage: parseFloat(country.pillsPerPackage) || 1,
+    }));
     
     console.log(`Returning countries data with month filter: ${req.query.month || 'none'}`);
-    res.json(results);
+    res.json(formattedResults);
   });
 });
 
@@ -560,6 +561,7 @@ app.get("/api/country/:countryId/details", (req, res) => {
     SELECT 
       c.name,
       c.currency,
+      c.iso_code,
       SUM(mc.quantity_purchased) AS total_medicines,
       AVG(mc.sale_price) AS avg_price,
       MAX(CASE WHEN mc.sale_price IS NULL THEN 1 ELSE 0 END) AS using_reference_price
@@ -593,8 +595,17 @@ app.get("/api/country/:countryId/details", (req, res) => {
       console.error("Error fetching country details:", err);
       return res.status(500).json({ error: "Database error" });
     }
-    console.log(`Country details for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, results[0]);
-    res.json(results[0] || null);
+    const countryDetails = results[0] || null; // Get the first row or null
+    if (countryDetails) {
+       // Ensure iso_code is included
+       countryDetails.iso_code = results[0].iso_code;
+      // Format the price if it exists
+      if (countryDetails.avg_price !== undefined && countryDetails.avg_price !== null) {
+        countryDetails.avg_price = parseFloat(countryDetails.avg_price);
+      }
+    }
+    console.log(`Country details for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, countryDetails);
+    res.json(countryDetails);
   });
 });
 

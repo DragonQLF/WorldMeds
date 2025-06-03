@@ -95,7 +95,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
                   </div>
                   <div className="flex flex-col items-center text-center w-full">
                     <span className="font-semibold text-lg mb-1">Countries</span>
-                    <span className="text-sm text-muted-foreground leading-relaxed">
+                    <span className="text-sm text-muted-foreground">
                       Discover medicine prices by geographic location
                     </span>
                   </div>
@@ -121,7 +121,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
                   </div>
                   <div className="flex flex-col items-center text-center w-full">
                     <span className="font-semibold text-lg mb-1">Medicines</span>
-                    <span className="text-sm text-muted-foreground leading-relaxed">
+                    <span className="text-sm text-muted-foreground">
                       Compare pharmaceutical prices worldwide
                     </span>
                   </div>

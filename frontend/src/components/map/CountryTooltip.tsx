@@ -2,6 +2,7 @@ import React, { useState, useEffect, memo, useCallback } from 'react';
 import { Pill, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatPrice } from "@/lib/utils";
+import FlagIcon from "@/components/flags/FlagIcon";
 
 interface CountryTooltipProps {
   country: {
@@ -14,6 +15,8 @@ interface CountryTooltipProps {
     totalMedicines: number;
     conversionRate?: number;
     pillsPerPackage?: number;
+    iso_code?: string;
+    bgColor?: string;
   };
   x: number;
   y: number;
@@ -149,34 +152,6 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
   
   const formattedQuantity = Number(country.totalMedicines || 0).toLocaleString();
   
-  // Get country code for flag (assuming countryName is in English)
-  const getCountryCode = (name: string) => {
-    // This is a simplified mapping for demonstration
-    const countryMap: { [key: string]: string } = {
-      "Brazil": "BR",
-      "United States": "US",
-      "Canada": "CA",
-      "Mexico": "MX",
-      "United Kingdom": "GB",
-      "France": "FR",
-      "Germany": "DE",
-      "Spain": "ES",
-      "Italy": "IT",
-      "Japan": "JP",
-      "China": "CN",
-      "India": "IN",
-      "Australia": "AU",
-      "Russia": "RU",
-      "Chile": "CL",
-      "Argentina": "AR",
-      // Add more mappings as needed
-    };
-    
-    return countryMap[name] || "UN"; // Return UN (United Nations) as fallback
-  };
-  
-  const countryCode = getCountryCode(country.countryName);
-  
   // Handle click on tooltip
   const handleTooltipClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -220,13 +195,18 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
         aria-label={`Location information for ${country.countryName}`}
       >
         {/* Flag indicator in colored square */}
-        <div className="flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10">
-          <div className={`flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10 rounded-md`}>
+        <div className="flex items-center justify-center">
+          
+          <div 
+            className={`flex items-center justify-center rounded-md`} 
+            style={{ backgroundColor: country.bgColor }}
+          >
             {/* Use the country-flag-icons component */}
-            <img 
-              src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`} 
-              alt={`${country.countryName} flag`} 
-              className="object-contain w-full h-full p-1"
+            
+            <FlagIcon 
+              isoCode={country.iso_code}
+              title={`${country.countryName} flag`} 
+              className="object-contain w-10 h-10 p-1 !w-10 !h-10"
             />
           </div>
         </div>

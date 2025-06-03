@@ -259,16 +259,16 @@ const Admin = () => {
 
   return (
     <Layout>
-      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 overflow-y-auto min-h-0">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
         </div>
 
         {/* Counter Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+          <Card className="hover:shadow-md transition-shadow w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-ellipsis overflow-hidden whitespace-nowrap">Total Users</CardTitle>
               <Users className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
             </CardHeader>
             <CardContent>
@@ -277,9 +277,9 @@ const Admin = () => {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Medicines</CardTitle>
+          <Card className="hover:shadow-md transition-shadow w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-ellipsis overflow-hidden whitespace-nowrap">Total Medicines</CardTitle>
               <Pill className="h-4 w-4 text-blue-500 dark:text-blue-400" />
             </CardHeader>
             <CardContent>
@@ -288,9 +288,9 @@ const Admin = () => {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Countries Covered</CardTitle>
+          <Card className="hover:shadow-md transition-shadow w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-ellipsis overflow-hidden whitespace-nowrap">Countries Covered</CardTitle>
               <Map className="h-4 w-4 text-green-500 dark:text-green-400" />
             </CardHeader>
             <CardContent>
@@ -299,9 +299,9 @@ const Admin = () => {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Online Users</CardTitle>
+          <Card className="hover:shadow-md transition-shadow w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-ellipsis overflow-hidden whitespace-nowrap">Online Users</CardTitle>
               <Activity className="h-4 w-4 text-rose-500 dark:text-rose-400" />
             </CardHeader>
             <CardContent>
@@ -322,19 +322,19 @@ const Admin = () => {
           <CardContent>
             <Tabs defaultValue="users" className="w-full" onValueChange={setActiveTab}>
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <TabsList>
+                <TabsList className="flex-wrap">
                   <TabsTrigger value="users">Users</TabsTrigger>
                   <TabsTrigger value="medicines">Medicines</TabsTrigger>
                   <TabsTrigger value="countries">Countries</TabsTrigger>
                 </TabsList>
                 
                 <div className="flex w-full md:w-auto items-center gap-2">
-                  <div className="relative flex-1 md:flex-none">
+                  <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="search"
                       placeholder={`Search ${activeTab}...`}
-                      className="pl-8 w-full md:w-[200px] lg:w-[300px]"
+                      className="pl-8 w-full"
                       value={searchQuery}
                       onChange={handleSearchChange}
                     />
@@ -363,10 +363,10 @@ const Admin = () => {
                       {filteredUsers.length > 0 ? (
                         filteredUsers.map((user) => (
                           <TableRow key={user.id}>
-                            <TableCell>
+                            <TableCell className="text-ellipsis overflow-hidden whitespace-nowrap">
                               {user.firstName} {user.lastName}
                             </TableCell>
-                            <TableCell>{user.email}</TableCell>
+                            <TableCell className="text-ellipsis overflow-hidden whitespace-nowrap">{user.email}</TableCell>
                             <TableCell>
                               <span className="capitalize">{user.role}</span>
                             </TableCell>
@@ -410,8 +410,8 @@ const Admin = () => {
                       {filteredMedicines.length > 0 ? (
                         filteredMedicines.map((medicine) => (
                           <TableRow key={medicine.id}>
-                            <TableCell>{medicine.name}</TableCell>
-                            <TableCell>{medicine.dosage || "N/A"}</TableCell>
+                            <TableCell className="text-ellipsis overflow-hidden whitespace-nowrap">{medicine.name}</TableCell>
+                            <TableCell className="text-ellipsis overflow-hidden whitespace-nowrap">{medicine.dosage || "N/A"}</TableCell>
                             <TableCell>{medicine.countryCount || 0}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
@@ -455,8 +455,8 @@ const Admin = () => {
                       {filteredCountries.length > 0 ? (
                         filteredCountries.map((country) => (
                           <TableRow key={country.id}>
-                            <TableCell>{country.name}</TableCell>
-                            <TableCell>{country.currency}</TableCell>
+                            <TableCell className="text-ellipsis overflow-hidden whitespace-nowrap">{country.name}</TableCell>
+                            <TableCell className="text-ellipsis overflow-hidden whitespace-nowrap">{country.currency}</TableCell>
                             <TableCell>{country.medicineCount || 0}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
@@ -491,7 +491,7 @@ const Admin = () => {
 
       {/* Create/Edit Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[550px] w-[95vw] max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>
               {selectedItem ? `Edit ${activeTab.slice(0, -1)}` : `Add ${activeTab.slice(0, -1)}`}

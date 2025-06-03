@@ -27,6 +27,8 @@ interface CountryData {
   totalMedicines: number;
   pillsPerPackage?: number;
   month?: string;
+  iso_code: string;
+  bgColor?: string;
 }
 
 interface TooltipData {
@@ -210,6 +212,33 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         console.log("Fetching country data with params:", dateParam);
         const countriesRes = await api.get(`/countries-average-prices${dateParam}`);
         
+        // Simple hash function to generate a consistent color based on country ID
+        const stringToColor = (str: string | number) => {
+          let hash = 0;
+          const s = String(str);
+          for (let i = 0; i < s.length; i++) {
+            hash = s.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          
+          // Use bitwise operations and multiplication for better hue distribution
+          const hue = (Math.abs(hash * 131) % 360 + 360) % 360; // Ensure positive and within 0-359
+          const saturation = 75; // Adjusted saturation
+          const lightness = 45; // Adjusted lightness
+
+          // Convert HSL to hexadecimal
+          const hslToHex = (h: number, s: number, l: number) => {
+            s /= 100;
+            l /= 100;
+            const k = (n: number) => (n + h / 30) % 12;
+            const a = s * Math.min(l, 1 - l);
+            const f = (n: number) =>
+              l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+            return `#${Math.round(255 * f(0)).toString(16).padStart(2, '0')}${Math.round(255 * f(8)).toString(16).padStart(2, '0')}${Math.round(255 * f(4)).toString(16).padStart(2, '0')}`;
+          };
+          
+          return hslToHex(hue, saturation, lightness);
+        };
+
         // Process each country's data in parallel for better performance
         const processedData = await Promise.all(countriesRes.data.map(async (country: any) => {
           // Ensure averagePrice is properly parsed as a number
@@ -238,16 +267,21 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
             }
           }
           
+          const generatedColor = stringToColor(country.countryId); /* Assign generated color */
+          console.log(`Country ID: ${country.countryId}, Generated Color: ${generatedColor}`);
+          
           return {
             countryId: country.countryId,
             countryName: country.countryName,
+            iso_code: country.iso_code,
             originalPrice: originalPrice,       // Package price in local currency
             averagePrice: averagePrice,         // Package price converted to USD
             previousPrice: previousPrices[country.countryId],
             totalMedicines: country.totalMedicines || 0,
             localCurrency: country.localCurrency || 'USD',
             pillsPerPackage: country.pillsPerPackage,
-            month: country.month || selectedMonth
+            month: country.month || selectedMonth,
+            bgColor: generatedColor,
           };
         }));
         

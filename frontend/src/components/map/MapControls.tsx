@@ -50,15 +50,15 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
 
   return (
     <div 
-      className={`fixed ${isMobile ? 'bottom-4 left-1/2 -translate-x-1/2' : 'bottom-4 right-4'} 
-      ${isMobile ? 'flex flex-row gap-1' : 'flex flex-col gap-1'} 
+      className={`fixed ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} 
+      ${isMobile ? 'flex flex-col gap-1' : 'flex flex-col gap-1'} 
       z-10 transition-all duration-500 ease-in-out ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
       }`}
     >
       {/* Visualization controls */}
-      <div className={`${isMobile ? 'flex flex-row' : 'flex flex-col'} gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl`}>
-        <div className={`${isMobile ? 'flex flex-row' : 'flex flex-col'} gap-1`}>
+      <div className={`${isMobile ? 'flex flex-col' : 'flex flex-col'} gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl`}>
+        <div className={`${isMobile ? 'flex flex-col' : 'flex flex-col'} gap-1`}>
           <Button
             variant="ghost"
             size="icon"
@@ -126,8 +126,8 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
       )}
       
       {/* Zoom Controls */}
-      <div className={`${isMobile ? 'flex flex-row' : 'flex flex-col'} gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl`}>
-        <div className={`${isMobile ? 'grid grid-cols-2' : 'grid grid-cols-1'} gap-1`}>
+      <div className={`${isMobile ? 'flex flex-col' : 'flex flex-col'} gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl`}>
+        <div className={`${isMobile ? 'grid grid-cols-1' : 'grid grid-cols-1'} gap-1`}>
           <Button 
             onClick={onZoomIn} 
             variant="ghost" 

@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,6 +15,7 @@ import { searchCountries, searchMedicines, getAllCountries, getAllMedicines, con
 import { Pill, TrendingUp, TrendingDown, ArrowLeft, Building, DollarSign } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import FlagIcon from "@/components/flags/FlagIcon";
 
 interface SearchResult {
   id: number;
@@ -30,6 +30,7 @@ interface SearchResult {
   // Fields for local currency comparison
   averagePriceLocal?: number;
   previousPriceLocal?: number;
+  iso_code?: string;
   [key: string]: any;
 }
 
@@ -206,12 +207,9 @@ export const CommandSearch: React.FC<CommandSearchProps> = ({
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center space-x-3 min-w-0">
                     {type === "country" ? (
-                      <img
-                        src={getCountryFlag(item.name)}
-                        alt={`${item.name} flag`}
-                        className="h-5 w-auto rounded-sm shrink-0"
-                        loading="lazy"
-                      />
+                      <div className="flex items-center justify-center rounded-sm shrink-0">
+                        <FlagIcon isoCode={item.iso_code} title={`${item.name} flag`} className="h-8 w-8 object-cover" />
+                      </div>
                     ) : (
                       <Pill className="h-5 w-5 text-primary shrink-0" />
                     )}
