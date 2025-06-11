@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import { InfoIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSidebar } from "@/hooks/useSidebar";
 
 interface MapLegendProps {
   globalAverage: number;
@@ -15,6 +16,11 @@ export const MapLegend: React.FC<MapLegendProps> = ({
   darkMode,
   selectedMonth
 }) => {
+  const { state } = useSidebar();
+  const isSidebarExpanded = state === "expanded";
+
+  const leftPositionClass = isSidebarExpanded ? "left-[236px]" : "left-[109px]";
+
   // Format the month for display if provided
   const formattedMonth = selectedMonth && selectedMonth !== 'all' ? 
     new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 
@@ -23,11 +29,12 @@ export const MapLegend: React.FC<MapLegendProps> = ({
   return (
     <div 
       className={cn(
-        "fixed bottom-4 left-4 p-2 rounded-md shadow-lg",
+        "fixed bottom-4 p-2 rounded-md shadow-lg",
+        leftPositionClass,
         "w-auto max-w-[180px] sm:max-w-xs md:w-64 transform transition-all duration-300",
         "max-h-[calc(100vh-32px)] overflow-y-visible",
         darkMode ? "bg-gray-800/95 text-white scrollbar-dark" : "bg-white/95 text-gray-800 scrollbar-light",
-        "backdrop-blur-sm z-50" /* Add backdrop blur and ensure it's above other elements */
+        "backdrop-blur-sm z-50"
       )}
     >
       <div className="text-sm font-medium mb-2 flex justify-between items-center">
