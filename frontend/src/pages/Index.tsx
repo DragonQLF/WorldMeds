@@ -26,6 +26,20 @@ const Index = () => {
   const isMobile = useIsMobile();
   const [selectedMedicineId, setSelectedMedicineId] = useState<string | null>(null);
   const [showMedicineDetail, setShowMedicineDetail] = useState<boolean>(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  
+  // Handlers for sidebar hover
+  const handleSidebarMouseEnter = () => {
+    if (!isMobile) {
+      setIsSidebarExpanded(true);
+    }
+  };
+
+  const handleSidebarMouseLeave = () => {
+    if (!isMobile) {
+      setIsSidebarExpanded(false);
+    }
+  };
   
   // Reset the detail view when component mounts or when date filters change
   useEffect(() => {
@@ -88,7 +102,11 @@ const Index = () => {
   };
 
   return (
-    <Layout>
+    <Layout 
+      isExpanded={isSidebarExpanded}
+      onMouseEnter={handleSidebarMouseEnter}
+      onMouseLeave={handleSidebarMouseLeave}
+    >
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background dark:bg-gray-950">
         {/* Search and actions buttons */}
         <div className={cn(
@@ -142,6 +160,7 @@ const Index = () => {
         
         <InteractiveMap 
           onCountryClick={handleCountrySelect} 
+          isSidebarExpanded={isSidebarExpanded}
         />
         
         {/* Country details modal - only show when in details view or explicitly opened */}

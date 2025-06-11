@@ -8,10 +8,17 @@ import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   className?: string;
+  isExpanded: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+export const Sidebar: React.FC<SidebarProps> = ({ 
+  className, 
+  isExpanded,
+  onMouseEnter,
+  onMouseLeave
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -38,18 +45,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       clearTimeout(timer);
     };
   }, []);
-
-  const handleMouseEnter = () => {
-    if (!isMobile) {
-      setIsExpanded(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (!isMobile) {
-      setIsExpanded(false);
-    }
-  };
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -80,8 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       className={cn(`flex h-screen flex-col justify-between items-start bg-background dark:bg-background border-r border-border dark:border-border py-10 transition-all duration-300 ease-in-out shadow-lg z-50 ${
         isExpanded ? "w-[220px] px-5" : "w-[93px] px-6"
       } ${isLoaded ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'}`, className)}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{ minWidth: isExpanded ? "220px" : "93px" }}
     >
       <SidebarLogo isExpanded={isExpanded} />

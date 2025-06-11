@@ -10,6 +10,7 @@ interface MapControlsProps {
   onZoomOut: () => void;
   onToggleLegend?: () => void;
   showLegend?: boolean;
+  isDateSliderOpen: boolean;
 }
 
 export const MapControls: React.FC<MapControlsProps> = memo(({
@@ -17,6 +18,7 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
   onZoomOut,
   onToggleLegend,
   showLegend = true,
+  isDateSliderOpen
 }) => {
   const { 
     visualizationType, 
@@ -48,13 +50,20 @@ export const MapControls: React.FC<MapControlsProps> = memo(({
   const controlClass = "w-8 h-8 flex items-center justify-center transition-transform duration-200 hover:scale-110";
   const activeClass = "bg-blue-100 dark:bg-purple-900 border-blue-500 dark:border-purple-600 text-[#007AFF] dark:text-white";
 
+  // Adjust bottom position based on isMobile and isDateSliderOpen
+  const bottomPositionClass = isMobile && isDateSliderOpen
+    ? "bottom-[180px]" // Adjust as needed to clear the date slider and legend
+    : "bottom-4";
+
   return (
     <div 
-      className={`fixed ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} 
-      ${isMobile ? 'flex flex-col gap-1' : 'flex flex-col gap-1'} 
-      z-10 transition-all duration-500 ease-in-out ${
+      className={cn(
+        "fixed right-4",
+        bottomPositionClass,
+        isMobile ? 'flex flex-col gap-1' : 'flex flex-col gap-1',
+        "z-10 transition-all duration-500 ease-in-out",
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-      }`}
+      )}
     >
       {/* Visualization controls */}
       <div className={`${isMobile ? 'flex flex-col' : 'flex flex-col'} gap-1 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg transition-all duration-200 hover:shadow-xl`}>

@@ -40,7 +40,8 @@ interface TooltipData {
 }
 
 interface InteractiveMapProps {
-  onCountryClick?: (country: { id: string | number; name: string; averagePrice: number; totalMedicines: number }) => void;
+  onCountryClick: (country: any) => void;
+  isSidebarExpanded: boolean;
 }
 
 interface CurrencyRates {
@@ -49,7 +50,7 @@ interface CurrencyRates {
 
 const geoUrl = "/features.json";
 
-const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
+const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapProps) => {
   const { 
     selectedMonth, 
     setSelectedMonth, 
@@ -690,6 +691,9 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
           globalAverage={globalAverage}
           darkMode={darkMode}
           selectedMonth={useTimeFiltering ? selectedMonth : null}
+          isSidebarExpanded={isSidebarExpanded}
+          isMobile={isMobile}
+          isDateSliderOpen={showMonthPicker}
         />
       )}
 
@@ -698,6 +702,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         onZoomOut={handleZoomOut}
         onToggleLegend={toggleLegend}
         showLegend={showLegend}
+        isDateSliderOpen={showMonthPicker}
       />
 
       {/* Render Date Slider */}

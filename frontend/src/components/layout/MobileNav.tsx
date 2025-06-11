@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { XIcon, Moon, Sun, LogIn, User, LogOut, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useSidebar } from "@/hooks/useSidebar";
@@ -150,7 +149,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]">
       <div className="h-full max-w-[85%] w-[300px] bg-background border-r border-border shadow-lg p-6 flex flex-col">
         <div className="flex justify-between items-center mb-8">
           <SidebarLogo isExpanded={true} />
