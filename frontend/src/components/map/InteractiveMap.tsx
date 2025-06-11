@@ -58,7 +58,9 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
     useTimeFiltering,
     darkMode,
     visualizationType,
-    setVisualizationType
+    setVisualizationType,
+    selectedDate,
+    dateRange
   } = useMapContext();
   const { isAuthenticated } = useAuth();
   const isMobile = useIsMobile();

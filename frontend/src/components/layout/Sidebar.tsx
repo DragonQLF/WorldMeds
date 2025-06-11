@@ -4,8 +4,13 @@ import { SidebarNav } from "./SidebarNav";
 import { SidebarFooter } from "./SidebarFooter";
 import { MobileNav } from "./MobileNav";
 import { Menu } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  className?: string;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -72,9 +77,9 @@ export const Sidebar: React.FC = () => {
   // For desktop: show sidebar
   return (
     <aside 
-      className={`flex h-screen flex-col justify-between items-start bg-background dark:bg-background border-r border-border dark:border-border py-10 transition-all duration-300 ease-in-out shadow-lg ${
+      className={cn(`flex h-screen flex-col justify-between items-start bg-background dark:bg-background border-r border-border dark:border-border py-10 transition-all duration-300 ease-in-out shadow-lg z-50 ${
         isExpanded ? "w-[220px] px-5" : "w-[93px] px-6"
-      } ${isLoaded ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'}`}
+      } ${isLoaded ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'}`, className)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{ minWidth: isExpanded ? "220px" : "93px" }}

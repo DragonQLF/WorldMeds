@@ -25,7 +25,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({
       className={cn(
         "fixed bottom-4 left-4 p-2 rounded-md shadow-lg",
         "w-auto max-w-[180px] sm:max-w-xs md:w-64 transform transition-all duration-300",
-        "max-h-[calc(100vh-32px)] overflow-y-auto",
+        "max-h-[calc(100vh-32px)] overflow-y-visible",
         darkMode ? "bg-gray-800/95 text-white scrollbar-dark" : "bg-white/95 text-gray-800 scrollbar-light",
         "backdrop-blur-sm z-50" /* Add backdrop blur and ensure it's above other elements */
       )}
@@ -48,7 +48,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({
                     <InfoIcon className="h-3 w-3 text-muted-foreground" />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[250px]">
+                <TooltipContent side="top" className="max-w-[250px] z-[100]">
                   <p>Using {formattedMonth} conversion rates</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     All prices are converted to USD using the exchange rates from {formattedMonth}.
@@ -67,7 +67,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({
                     <InfoIcon className="h-3 w-3 text-muted-foreground" />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[250px]">
+                <TooltipContent side="top" className="max-w-[250px] z-[100]">
                   <p>Average price across all available months.</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Each price is converted to USD using the historical exchange rate from its respective month.
