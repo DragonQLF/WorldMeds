@@ -200,7 +200,8 @@ app.get("/api/currency-rates", async (req, res) => {
   logger.info('API Request: /api/currency-rates', { query: req.query, body: req.body });
   try {
     logger.info("Backend /api/currency-rates endpoint hit");
-    const rates = await fetchBackendCurrencyRates();
+    const { date } = req.query;
+    const rates = await fetchBackendCurrencyRates(date);
     if (rates && Object.keys(rates).length > 0) {
       res.json(rates);
     } else {
@@ -222,7 +223,8 @@ app.get("/api/global-average-medicine-price", async (req, res) => {
     let sql = `
       SELECT 
         mc.sale_price, 
-        c.currency AS local_currency
+        c.currency AS local_currency,
+        mc.month
       FROM medicine_countries mc
       JOIN countries c ON mc.country_id = c.id
     `;
@@ -256,12 +258,14 @@ app.get("/api/global-average-medicine-price", async (req, res) => {
         return res.json({ global_average: 0 });
       }
       
-      // Convert all prices to USD before averaging
+      // Convert all prices to USD before averaging, using the appropriate date for each price
       const pricePromises = results.map(async (item) => {
         if (item.sale_price === null || item.sale_price === undefined) {
           return null; // Skip null prices
         }
-        return await convertToUSD(item.sale_price, item.local_currency);
+        // Use the month of the price data for historical rates
+        const rateDate = item.month ? new Date(item.month).toISOString().split('T')[0] : undefined;
+        return await convertToUSD(item.sale_price, item.local_currency, rateDate);
       });
       
       // Wait for all conversions to complete

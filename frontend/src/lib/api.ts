@@ -42,6 +42,7 @@ const formatMonthForAPI = (dateString: string): string => {
 let currencyRatesCache: {
   timestamp: number;
   rates: Record<string, number>;
+  date?: string;
 } | null = null;
 
 // Cache duration in milliseconds (4 hours)
@@ -68,26 +69,34 @@ const STATIC_CURRENCY_RATES: Record<string, number> = {
 };
 
 // Function to get currency rates from the new API endpoint - export for use in other components
-export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
+export const fetchCurrencyRates = async (date?: string): Promise<Record<string, number>> => {
   try {
-    // Check if we have valid cached rates
-    if (currencyRatesCache && (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION)) {
+    // Check if we have valid cached rates for the requested date
+    if (currencyRatesCache && 
+        (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION) && 
+        (!date || currencyRatesCache.date === date)) {
       return currencyRatesCache.rates;
     }
     
     // If no valid cache, fetch from the API
-    const response = await api.get('/currency-rates'); // This is /api/currency-rates relative to API_BASE_URL
+    const response = await api.get('/currency-rates', { params: { date } });
     
     if (response.data && Object.keys(response.data).length > 0) {
       currencyRatesCache = {
         timestamp: Date.now(),
-        rates: response.data
+        rates: response.data,
+        date: date || 'latest'
       };
       return response.data;
     }
     console.warn('Backend returned no/empty data for currency rates (frontend).');
     
-    const responseDirect = await axios.get(CURRENCY_API_URL);
+    // If backend fails, try direct API call
+    const apiUrl = date 
+      ? `https://${date}.currency-api.pages.dev/v1/currencies/usd.json`
+      : CURRENCY_API_URL;
+    
+    const responseDirect = await axios.get(apiUrl);
     
     if (responseDirect.data && responseDirect.data.usd) {
       const normalizedRates: Record<string, number> = {};
@@ -97,7 +106,8 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
       
       currencyRatesCache = {
         timestamp: Date.now(),
-        rates: normalizedRates
+        rates: normalizedRates,
+        date: date || 'latest'
       };
       
       return normalizedRates;
@@ -124,7 +134,7 @@ export const fetchCurrencyRates = async (): Promise<Record<string, number>> => {
 };
 
 // Function to get currency conversion rate with better handling of lower/uppercase
-export const getCurrencyRate = async (fromCurrency: string, toCurrency: string): Promise<number> => {
+export const getCurrencyRate = async (fromCurrency: string, toCurrency: string, date?: string): Promise<number> => {
   try {
     // Standard format for currency codes - use lowercase for API compatibility
     const from = fromCurrency.toLowerCase();
@@ -136,7 +146,7 @@ export const getCurrencyRate = async (fromCurrency: string, toCurrency: string):
     }
     
     // Fetch rates from the API or cache
-    const rates = await fetchCurrencyRates();
+    const rates = await fetchCurrencyRates(date);
     
     // For USD to any currency, we can use rates directly
     if (from === 'usd') {
@@ -195,7 +205,12 @@ export const getCurrencyRate = async (fromCurrency: string, toCurrency: string):
 };
 
 // Improved function to convert currency with better error handling
-export const convertCurrency = async (amount: number, fromCurrency: string, toCurrency: string): Promise<number> => {
+export const convertCurrency = async (
+  amount: number, 
+  fromCurrency: string, 
+  toCurrency: string, 
+  date?: string
+): Promise<number> => {
   if (amount === null || amount === undefined || isNaN(Number(amount))) {
     console.warn('Invalid amount for conversion:', amount);
     return 0;
@@ -214,7 +229,7 @@ export const convertCurrency = async (amount: number, fromCurrency: string, toCu
   }
   
   try {
-    const rate = await getCurrencyRate(fromCurrency, toCurrency);
+    const rate = await getCurrencyRate(fromCurrency, toCurrency, date);
     const convertedAmount = numericAmount * rate;
     // Format to 2 decimal places and convert back to number
     return parseFloat(convertedAmount.toFixed(2));
@@ -225,7 +240,11 @@ export const convertCurrency = async (amount: number, fromCurrency: string, toCu
 };
 
 // Improved function to convert to USD with better handling for all currencies
-export const convertToUSD = async (amount: number, fromCurrency: string): Promise<number> => {
+export const convertToUSD = async (
+  amount: number, 
+  fromCurrency: string, 
+  date?: string
+): Promise<number> => {
   if (amount === null || amount === undefined || isNaN(Number(amount))) {
     console.warn('Invalid amount for conversion:', amount);
     return 0;
@@ -248,7 +267,7 @@ export const convertToUSD = async (amount: number, fromCurrency: string): Promis
   }
   
   try {
-    const rate = await getCurrencyRate(currency, 'usd');
+    const rate = await getCurrencyRate(currency, 'usd', date);
     const convertedAmount = numericAmount * rate;
     return parseFloat(convertedAmount.toFixed(2));
   } catch (error) {

@@ -143,7 +143,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
         const item = displayData[i];
         if (item.currency && item.currency.toUpperCase() !== 'USD') {
           try {
-            const usdPrice = await convertToUSD(item.price, item.currency);
+            // Use the month of the current price for historical rates
+            const rateDate = item.month ? new Date(item.month).toISOString().split('T')[0] : undefined;
+            const usdPrice = await convertToUSD(item.price, item.currency, rateDate);
             item.displayPrice = usdPrice;
             item.displayCurrency = 'USD';
           } catch (error) {
@@ -161,7 +163,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
           item.displayTrendData = await Promise.all(item.trendData.map(async (trendItem: any) => {
             if (trendItem.currency && trendItem.currency.toUpperCase() !== 'USD') {
               try {
-                const usdTrendPrice = await convertToUSD(trendItem.price, trendItem.currency);
+                // Use the month of the trend data for historical rates
+                const rateDate = trendItem.month ? new Date(trendItem.month).toISOString().split('T')[0] : undefined;
+                const usdTrendPrice = await convertToUSD(trendItem.price, trendItem.currency, rateDate);
                 return { ...trendItem, price: usdTrendPrice, currency: 'USD' };
               } catch (error) {
                 console.error("Error converting trend price to USD:", error);

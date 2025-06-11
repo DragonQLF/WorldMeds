@@ -1,6 +1,8 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
+import { InfoIcon } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MapLegendProps {
   globalAverage: number;
@@ -21,11 +23,11 @@ export const MapLegend: React.FC<MapLegendProps> = ({
   return (
     <div 
       className={cn(
-        "p-2 rounded-md shadow-lg",
+        "fixed bottom-4 left-4 p-2 rounded-md shadow-lg",
         "w-auto max-w-[180px] sm:max-w-xs md:w-64 transform transition-all duration-300",
         "max-h-[calc(100vh-32px)] overflow-y-auto",
         darkMode ? "bg-gray-800/95 text-white scrollbar-dark" : "bg-white/95 text-gray-800 scrollbar-light",
-        "backdrop-blur-sm" /* Add backdrop blur for better visibility */
+        "backdrop-blur-sm z-50" /* Add backdrop blur and ensure it's above other elements */
       )}
     >
       <div className="text-sm font-medium mb-2 flex justify-between items-center">
@@ -35,11 +37,45 @@ export const MapLegend: React.FC<MapLegendProps> = ({
         </span>
       </div>
       
-      <div className="text-xs mb-2">
+      <div className="text-xs mb-2 flex items-center gap-1">
         {formattedMonth ? (
-          <span>Global average ({formattedMonth}): ${formatPrice(globalAverage)} USD</span>
+          <>
+            <span>Global average ({formattedMonth}): ${formatPrice(globalAverage)} USD</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-help">
+                    <InfoIcon className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[250px]">
+                  <p>Using {formattedMonth} conversion rates</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    All prices are converted to USD using the exchange rates from {formattedMonth}.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
         ) : (
-          <span>Global average: ${formatPrice(globalAverage)} USD</span>
+          <>
+            <span>Global average (All Time): ${formatPrice(globalAverage)} USD</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-help">
+                    <InfoIcon className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[250px]">
+                  <p>Average price across all available months.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Each price is converted to USD using the historical exchange rate from its respective month.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
         )}
       </div>
       

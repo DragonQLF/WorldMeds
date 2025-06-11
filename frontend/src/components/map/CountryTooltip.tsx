@@ -3,7 +3,6 @@ import { Pill, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatPrice } from "@/lib/utils";
 import FlagIcon from "@/components/flags/FlagIcon";
-import { geoMercator } from 'd3-geo';
 
 interface CountryTooltipProps {
   country: {
@@ -19,85 +18,95 @@ interface CountryTooltipProps {
     iso_code?: string;
     bgColor?: string;
   };
-  coordinates: [number, number]; // [longitude, latitude]
+  x: number;
+  y: number;
   darkMode: boolean;
   isPinned: boolean;
   onPin: () => void;
   mapRef?: React.RefObject<HTMLDivElement>;
-  projection: any; // The D3 projection function from react-simple-maps
-  position: { // Add position prop
-    coordinates: [number, number];
-    zoom: number;
-  };
+  zoom: number;
 }
 
-export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
-  country,
-  coordinates,
+export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({ 
+  country, 
+  x, 
+  y, 
   darkMode,
   isPinned,
   onPin,
   mapRef,
-  projection,
-  position // Destructure position here
+  zoom
 }) => {
   const [convertedPrice, setConvertedPrice] = useState<number | null>(null);
   const [originalPrice, setOriginalPrice] = useState<number | null>(null);
   const [isConverting, setIsConverting] = useState<boolean>(false);
-  const [screenPosition, setScreenPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x, y });
   
-  // Update screen position whenever map projection changes or coordinates change
-  useEffect(() => {
-    const updateScreenPosition = () => {
-      if (!projection || !mapRef?.current) return;
-
-      // Project the geographic coordinates to screen coordinates
-      const [x, y] = projection(coordinates) || [0, 0];
-      
-      // Get map dimensions for clamping
-      const mapRect = mapRef.current.getBoundingClientRect();
-      
-      // Define tooltip dimensions
-      const tooltipWidth = 220; // Approximate width
-      const tooltipHeight = 120; // Approximate height
-      
-      // Clamp coordinates to keep tooltip within map bounds
-      // Adjusting for the tooltip to be above the point, so y - height
-      const clampedX = Math.min(
-        Math.max(x, tooltipWidth / 2 + 10),
-        mapRect.width - tooltipWidth / 2 - 10
-      );
-      
-      // Keep the tooltip above the point. Subtract tooltip height from y.
-      const clampedY = Math.min(
-        Math.max(y - tooltipHeight - 10, 10), // At least 10px from top
-        mapRect.height - tooltipHeight / 2 - 10 // At least 10px from bottom (half height for centering)
-      );
-      
-      setScreenPosition({ x: clampedX, y: clampedY });
-    };
-
-    updateScreenPosition();
+  // Calculate position to ensure tooltip stays visible within the viewport
+  // This function will be called initially and when the map moves
+  const updatePosition = useCallback(() => {
+    if (!mapRef?.current) {
+      return;
+    }
     
-    // No need for separate map move listeners, as projection updates trigger this effect
-    // window.addEventListener('resize', updateScreenPosition); // Keep resize listener
-    const handleResize = () => updateScreenPosition();
-    window.addEventListener('resize', handleResize);
+    // Get map dimensions and position
+    const mapRect = mapRef.current.getBoundingClientRect();
+    
+    // Define tooltip width and height (approximate)
+    const tooltipWidth = 220;
+    const tooltipHeight = 120;
+    
+    // Calculate safe coordinates to keep tooltip within map boundaries
+    const safeX = Math.min(
+      Math.max(x, mapRect.left + tooltipWidth/2 + 10), 
+      mapRect.right - tooltipWidth/2 - 10
+    );
+    
+    const safeY = Math.min(
+      Math.max(y - 20, mapRect.top + tooltipHeight/2), 
+      mapRect.bottom - tooltipHeight - 10
+    );
+    
+    setPosition({ x: safeX, y: safeY });
+  }, [x, y, mapRef]);
 
+  // Update position when props change or map moves
+  useEffect(() => {
+    updatePosition();
+    
+    // Add event listeners to track map movement and resize
+    const handleMapMove = () => updatePosition();
+    window.addEventListener('resize', updatePosition);
+    
+    if (mapRef?.current) {
+      mapRef.current.addEventListener('mousemove', handleMapMove);
+      mapRef.current.addEventListener('wheel', handleMapMove);
+      mapRef.current.addEventListener('drag', handleMapMove);
+    }
+    
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', updatePosition);
+      if (mapRef?.current) {
+        mapRef.current.removeEventListener('mousemove', handleMapMove);
+        mapRef.current.removeEventListener('wheel', handleMapMove);
+        mapRef.current.removeEventListener('drag', handleMapMove);
+      }
     };
-  }, [coordinates, projection, mapRef, position.coordinates, position.zoom]); // Add position dependencies here
+  }, [x, y, isPinned, mapRef, updatePosition]);
   
+  // Calculate scale factor based on zoom level
+  const scale = Math.min(1.5, Math.max(0.8, 1.2 / zoom)); // Adjusted for inverse scaling: smaller when zooming in, larger when zooming out
+
   const positionStyle: React.CSSProperties = {
     position: 'absolute',
-    left: `${screenPosition.x}px`,
-    top: `${screenPosition.y}px`,
-    transform: 'translate(-50%, -100%)', // Adjust to place tooltip above the point
-    zIndex: isPinned ? 30 : 20,
+    left: `${position.x}px`, 
+    top: `${position.y}px`,
+    transform: `translate(-50%, -110%) scale(${scale})`, // Apply scale here
+    transformOrigin: 'bottom center', // Set transform origin to bottom center
+    zIndex: isPinned ? 30 : 20, 
     pointerEvents: 'auto'
   };
-
+  
   // Calculate price change in local currency (for arrow/percent)
   const calculateLocalPriceChange = () => {
     // Use originalPrice (local currency) and previousPrice (local currency)
@@ -181,13 +190,21 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
   return (
     <div 
       style={positionStyle} 
-      className={`${isPinned ? 'opacity-100' : 'opacity-90 hover:opacity-100'} transition-opacity duration-200`}
+      className={`relative ${isPinned ? 'opacity-100' : 'opacity-90 hover:opacity-100'} transition-opacity duration-200`}
       onClick={handleTooltipClick}
       data-testid="country-tooltip"
     >
+      {/* Triangle pointer - zIndex 1 to be behind the main tooltip content */}
+      <div 
+        className={`w-4 h-4 transform rotate-45 absolute -bottom-2 left-1/2 -translate-x-1/2 ${
+          darkMode ? 'bg-gray-800' : 'bg-white border-r border-b border-gray-200'
+        }`}
+        style={{ zIndex: 1, transform: `rotate(45deg) scale(${scale})` }} 
+      ></div>
+
       <section 
-        className={`flex overflow-hidden z-0 gap-2 sm:gap-3 items-center px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl ${
-          darkMode ? 'bg-gray-800' : 'bg-white border border-gray-200 shadow-md'
+        className={`relative z-20 flex overflow-hidden gap-2 sm:gap-3 items-center px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl ${
+          darkMode ? 'bg-gray-800' : 'bg-white border border-gray-200 shadow-md' // Apply shadow here
         }`}
         aria-label={`Location information for ${country.countryName}`}
       >
@@ -268,13 +285,6 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
           </div>
         </div>
       </section>
-      
-      {/* Triangle pointer */}
-      <div 
-        className={`w-3 h-3 transform rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2 ${
-          darkMode ? 'bg-gray-800' : 'bg-white border-r border-b border-gray-200'
-        }`}
-      ></div>
     </div>
   );
 });

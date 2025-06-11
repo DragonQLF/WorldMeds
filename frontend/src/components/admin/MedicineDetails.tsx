@@ -32,6 +32,7 @@ interface Transaction {
   countryId: string;
   pillsPerPackage: number;
   currency?: string;
+  date?: string;
 }
 
 interface Country {
@@ -42,6 +43,7 @@ interface Country {
   lastPrice: number;
   lastQuantity: number;
   pillsPerPackage: number;
+  lastUpdate?: string;
 }
 
 const MedicineDetails: React.FC<MedicineDetailsProps> = ({ medicineId }) => {
@@ -89,7 +91,9 @@ const MedicineDetails: React.FC<MedicineDetailsProps> = ({ medicineId }) => {
       for (const transaction of transactions) {
         if (transaction.currency && transaction.currency !== 'USD') {
           try {
-            const convertedPrice = await convertToUSD(transaction.price, transaction.currency);
+            // Use the transaction date for historical rates
+            const rateDate = transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : undefined;
+            const convertedPrice = await convertToUSD(transaction.price, transaction.currency, rateDate);
             newPrices[`transaction-${transaction.id}`] = convertedPrice;
           } catch (error) {
             console.error(`Failed to convert price for transaction ${transaction.id}:`, error);
@@ -101,7 +105,9 @@ const MedicineDetails: React.FC<MedicineDetailsProps> = ({ medicineId }) => {
       for (const country of countries) {
         if (country.currency && country.currency !== 'USD') {
           try {
-            const convertedPrice = await convertToUSD(country.lastPrice, country.currency);
+            // Use the last update date for historical rates
+            const rateDate = country.lastUpdate ? new Date(country.lastUpdate).toISOString().split('T')[0] : undefined;
+            const convertedPrice = await convertToUSD(country.lastPrice, country.currency, rateDate);
             newPrices[`country-${country.id}`] = convertedPrice;
           } catch (error) {
             console.error(`Failed to convert price for country ${country.id}:`, error);

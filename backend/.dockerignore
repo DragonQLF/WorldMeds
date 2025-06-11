@@ -13,3 +13,5 @@ coverage
 .vscode
 .idea
 *.log
+uploads/*
+!uploads/.gitkeep 

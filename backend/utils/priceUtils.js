@@ -35,13 +35,16 @@ const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
 /**
  * Fetches currency rates from the API
+ * @param {string} [date] - Optional date in YYYY-MM-DD format. If not provided, uses latest rates
  * @returns {Promise<Object>} Object with currency rates
  */
-const fetchCurrencyRates = async () => {
+const fetchCurrencyRates = async (date) => {
   try {
-    // Check if we have valid cached rates
-    if (currencyRatesCache.timestamp && (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION)) {
-      currencyRatesCache.cacheHits++;  // Increment counter
+    // Check if we have valid cached rates for the requested date
+    if (currencyRatesCache.timestamp && 
+        (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION) && 
+        (!date || currencyRatesCache.date === date)) {
+      currencyRatesCache.cacheHits++;
       process.stdout.write(`\rUsing cached currency rates (backend) (${currencyRatesCache.cacheHits} times)`);
       return currencyRatesCache.rates;
     }
@@ -50,8 +53,13 @@ const fetchCurrencyRates = async () => {
     currencyRatesCache.cacheHits = 0;
     process.stdout.write('\rFetching fresh currency rates from API (backend)...');
     
+    // Construct API URL based on whether a date is provided
+    const apiUrl = date 
+      ? `https://${date}.currency-api.pages.dev/v1/currencies/usd.json`
+      : 'https://latest.currency-api.pages.dev/v1/currencies/usd.json';
+    
     // Use node-fetch
-    const response = await fetch('https://latest.currency-api.pages.dev/v1/currencies/usd.json');
+    const response = await fetch(apiUrl);
     
     if (!response.ok) {
       process.stdout.write('\rError fetching currency rates from API\n');
@@ -65,7 +73,8 @@ const fetchCurrencyRates = async () => {
       currencyRatesCache = {
         timestamp: Date.now(),
         rates: data.usd,
-        cacheHits: 0
+        cacheHits: 0,
+        date: date || 'latest'
       };
       process.stdout.write('\rCurrency rates updated successfully\n');
       
@@ -152,9 +161,10 @@ const preparePriceData = async (price, localCurrency) => {
  * Performs currency conversion from local currency to USD
  * @param {number} amount - Amount in local currency
  * @param {string} fromCurrency - Source currency code
+ * @param {string} [date] - Optional date in YYYY-MM-DD format for historical rates
  * @returns {number} Converted amount in USD
  */
-const convertToUSD = async (amount, fromCurrency) => {
+const convertToUSD = async (amount, fromCurrency, date) => {
   // Currency codes should always be lowercase for consistency with the API
   const currency = (fromCurrency?.toLowerCase() || 'usd');
   
@@ -173,8 +183,8 @@ const convertToUSD = async (amount, fromCurrency) => {
   }
   
   try {
-    // Get the latest rates from the API
-    const rates = await fetchCurrencyRates();
+    // Get the rates from the API (historical if date provided)
+    const rates = await fetchCurrencyRates(date);
     
     // If currency not found, return original amount with warning
     if (!rates[currency]) {

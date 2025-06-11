@@ -86,7 +86,7 @@ router.get("/general", async (req, res) => {
     // 4. Get all prices with currencies for USD conversion and global average
     const allPricesResult = await new Promise((resolve, reject) => {
       const query = `
-        SELECT mc.sale_price, c.currency 
+        SELECT mc.sale_price, c.currency, mc.month 
         FROM medicine_countries mc
         JOIN countries c ON mc.country_id = c.id
         WHERE mc.sale_price IS NOT NULL ${dateFilter}
@@ -100,7 +100,9 @@ router.get("/general", async (req, res) => {
     // Convert all prices to USD and calculate global average
     const usdPrices = [];
     for (const item of allPricesResult) {
-      const usdPrice = await convertToUSD(item.sale_price, item.currency);
+      // Use the month of the price data for historical rates
+      const rateDate = item.month ? new Date(item.month).toISOString().split('T')[0] : undefined;
+      const usdPrice = await convertToUSD(item.sale_price, item.currency, rateDate);
       if (usdPrice && !isNaN(usdPrice)) {
         usdPrices.push(usdPrice);
       }
@@ -114,11 +116,12 @@ router.get("/general", async (req, res) => {
         SELECT 
           c.name,
           c.currency,
-          AVG(mc.sale_price) as avg_price
+          AVG(mc.sale_price) as avg_price,
+          mc.month
         FROM medicine_countries mc
         JOIN countries c ON mc.country_id = c.id
         WHERE mc.sale_price IS NOT NULL ${dateFilter}
-        GROUP BY c.id, c.name, c.currency
+        GROUP BY c.id, c.name, c.currency, mc.month
       `;
       db.query(query, params, (err, results) => {
         if (err) reject(err);
@@ -129,7 +132,9 @@ router.get("/general", async (req, res) => {
     // Convert country averages to USD and find min/max
     const countryUSDPrices = [];
     for (const country of countryAveragesResult) {
-      const usdPrice = await convertToUSD(country.avg_price, country.currency);
+      // Use the month of the price data for historical rates
+      const rateDate = country.month ? new Date(country.month).toISOString().split('T')[0] : undefined;
+      const usdPrice = await convertToUSD(country.avg_price, country.currency, rateDate);
       if (usdPrice && !isNaN(usdPrice)) {
         countryUSDPrices.push({
           country: country.name,
@@ -328,7 +333,9 @@ router.get("/global-trends", async (req, res) => {
     // Process results: convert to USD and aggregate by month
     const monthlyStats = {};
     for (const item of results) {
-      const usdPrice = await convertToUSD(item.sale_price, item.currency);
+      // Use the first day of the month for historical rates
+      const rateDate = item.month;
+      const usdPrice = await convertToUSD(item.sale_price, item.currency, rateDate);
       if (usdPrice && !isNaN(usdPrice)) {
         if (!monthlyStats[item.month]) {
           monthlyStats[item.month] = {
