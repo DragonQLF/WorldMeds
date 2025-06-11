@@ -21,10 +21,11 @@ export const MapLegend: React.FC<MapLegendProps> = ({
   return (
     <div 
       className={cn(
-        "absolute bottom-2 left-2 p-2 rounded-md shadow-lg z-10",
+        "p-2 rounded-md shadow-lg",
         "w-auto max-w-[180px] sm:max-w-xs md:w-64 transform transition-all duration-300",
         "max-h-[calc(100vh-32px)] overflow-y-auto",
-        darkMode ? "bg-gray-800/90 text-white scrollbar-dark" : "bg-white/90 text-gray-800 scrollbar-light"
+        darkMode ? "bg-gray-800/95 text-white scrollbar-dark" : "bg-white/95 text-gray-800 scrollbar-light",
+        "backdrop-blur-sm" /* Add backdrop blur for better visibility */
       )}
     >
       <div className="text-sm font-medium mb-2 flex justify-between items-center">

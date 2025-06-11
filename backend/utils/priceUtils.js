@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for price calculations across the application
  */
@@ -25,7 +24,8 @@ const formatPrice = (price, decimals = 2) => {
  */
 let currencyRatesCache = {
   timestamp: 0,
-  rates: {}
+  rates: {},
+  cacheHits: 0  // Add counter for cache hits
 };
 
 /**
@@ -41,16 +41,20 @@ const fetchCurrencyRates = async () => {
   try {
     // Check if we have valid cached rates
     if (currencyRatesCache.timestamp && (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION)) {
-      console.log('Using cached currency rates (backend)');
+      currencyRatesCache.cacheHits++;  // Increment counter
+      process.stdout.write(`\rUsing cached currency rates (backend) (${currencyRatesCache.cacheHits} times)`);
       return currencyRatesCache.rates;
     }
     
-    console.log('Fetching fresh currency rates from API (backend using node-fetch)');
+    // Reset cache hits counter when fetching new rates
+    currencyRatesCache.cacheHits = 0;
+    process.stdout.write('\rFetching fresh currency rates from API (backend)...');
+    
     // Use node-fetch
     const response = await fetch('https://latest.currency-api.pages.dev/v1/currencies/usd.json');
     
     if (!response.ok) {
-      console.error(`API response error (backend): ${response.status} ${response.statusText}`);
+      process.stdout.write('\rError fetching currency rates from API\n');
       throw new Error(`API response error: ${response.status} ${response.statusText}`);
     }
     
@@ -60,9 +64,10 @@ const fetchCurrencyRates = async () => {
       // Store in cache
       currencyRatesCache = {
         timestamp: Date.now(),
-        rates: data.usd
+        rates: data.usd,
+        cacheHits: 0
       };
-      console.log('Updated currency rate cache (backend)');
+      process.stdout.write('\rCurrency rates updated successfully\n');
       
       // Update the static rates with the new data for those currencies that exist
       Object.keys(STATIC_CURRENCY_RATES).forEach(currency => {
@@ -73,14 +78,15 @@ const fetchCurrencyRates = async () => {
       
       return data.usd;
     } else {
-      console.error('Invalid response format from currency API (backend)');
-      throw new Error('Invalid response format from currency API (backend)');
+      process.stdout.write('\rInvalid response format from currency API\n');
+      throw new Error('Invalid response format from currency API');
     }
   } catch (error) {
-    console.error('Error in fetchCurrencyRates (backend):', error.message); // Log only message
+    process.stdout.write('\rError in fetchCurrencyRates (backend)\n');
+    console.error('Error details:', error.message);
     
     // Fall back to static rates if API call fails
-    console.log('Falling back to static currency rates due to fetch error (backend).');
+    process.stdout.write('\rFalling back to static currency rates\n');
     return STATIC_CURRENCY_RATES;
   }
 };

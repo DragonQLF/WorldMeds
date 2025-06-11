@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { CountryTooltip } from "./CountryTooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import DateSlider from "./DateSlider";
+import { geoCentroid } from 'd3-geo';
 
 interface CountryData {
   countryId: string | number;
@@ -32,11 +33,11 @@ interface CountryData {
 }
 
 interface TooltipData {
-  x: number;
-  y: number;
+  coordinates: [number, number]; // [longitude, latitude]
   country: CountryData;
   visible: boolean;
   isPinned: boolean;
+  geoObject?: any; // Store the full geo object for centroid calculation if needed
 }
 
 interface InteractiveMapProps {
@@ -72,6 +73,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
   const zoomLevel = useRef(position.zoom);
   const frameId = useRef<number | null>(null);
   const isMoving = useRef(false);
+  const mapProjectionRef = useRef<any>(null); // To store the projection function from react-simple-maps
 
   // State for map container dimensions
   const [mapDimensions, setMapDimensions] = useState({ width: 800, height: 600 }); // Initial dimensions
@@ -122,8 +124,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         // If we don't have the rate cached, get it from the API
         const convertedAmount = await convertToUSD(amount, currency);
         return convertedAmount;
-      }
-      
+      }      
       // If currency is not USD, and we have a rate, convert to USD
       // API rates are USD to currency we divide
       return amount / rate;
@@ -412,7 +413,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       console.log("Country not found in data:", countryName);
       toast({
         title: "No Data Available",
-        description: `${countryName} has no medicine data available.`,
+        description: `${countryName} has no medicine data available.`, 
         variant: "destructive"
       });
       return;
@@ -423,7 +424,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       console.log("Country has no data:", countryName);
       toast({
         title: "No Data Available",
-        description: `${countryName} has no medicine data available.`,
+        description: `${countryName} has no medicine data available.`, 
         variant: "destructive"
       });
       return;
@@ -447,9 +448,8 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
     } else {
       // For tooltips view, toggle tooltip pin on click
       if (event && mapContainerRef.current) {
-        const mapRect = mapContainerRef.current.getBoundingClientRect();
-        const x = event.clientX - mapRect.left;
-        const y = event.clientY - mapRect.top;
+        // Use d3-geo's geoCentroid to get the actual centroid of the feature
+        const centroidCoordinates: [number, number] = geoCentroid(geo);
         
         // Check if this country already has a tooltip
         const existingTooltipIndex = tooltips.findIndex(
@@ -463,20 +463,20 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
           } else {
             setTooltips(prev => prev.map((tooltip, i) => 
               i === existingTooltipIndex 
-                ? { ...tooltip, isPinned: true }
+                ? { ...tooltip, isPinned: true, coordinates: centroidCoordinates } // Update coordinates too
                 : tooltip
             ));
           }
         } else {
-          // Add a new tooltip
+          // Add a new tooltip with geographic coordinates
           setTooltips(prev => [
             ...prev, 
             { 
-              x, 
-              y, 
+              coordinates: centroidCoordinates, // Use centroid
               country, 
               visible: true,
-              isPinned: true
+              isPinned: true,
+              geoObject: geo // Store geoObject for future use if needed
             }
           ]);
         }
@@ -507,20 +507,19 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
         
         // Only show hover tooltip if there isn't already a pinned one for this country
         if (!hasPinnedTooltip) {
+          // Use d3-geo's geoCentroid for hover too
+          const centroidCoordinates: [number, number] = geoCentroid(geo);
+          
           // Create or update temporary hover tooltip
           const existingTooltipIndex = tooltips.findIndex(
             t => t.country.countryId === country.countryId && !t.isPinned
           );
           
-          const mapRect = mapContainerRef.current.getBoundingClientRect();
-          const x = event.clientX - mapRect.left;
-          const y = event.clientY - mapRect.top;
-
           if (existingTooltipIndex >= 0) {
             // Update existing hover tooltip
             setTooltips(prev => prev.map((tooltip, i) => 
               i === existingTooltipIndex 
-                ? { ...tooltip, x: x, y: y, visible: true }
+                ? { ...tooltip, coordinates: centroidCoordinates, visible: true } // Update coordinates
                 : tooltip
             ));
           } else {
@@ -528,11 +527,11 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
             setTooltips(prev => [
               ...prev.filter(t => t.isPinned), // Keep only pinned tooltips
               { 
-                x: x,
-                y: y,
+                coordinates: centroidCoordinates, // Use centroid
                 country, 
                 visible: true,
-                isPinned: false
+                isPinned: false,
+                geoObject: geo
               }
             ]);
           }
@@ -580,7 +579,7 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
           return prev.map((t, i) => 
             i === tooltipIndex ? { ...t, isPinned: true } : t
           );
-        }
+        }  
       }
       return prev;
     });
@@ -597,6 +596,41 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
       </div>
     );
   }
+
+  // New component to wrap Geographies for better type inference
+  const MapGeographies: React.FC<{ projection: any }> = React.memo(({ projection }) => {
+    mapProjectionRef.current = projection; // Store the projection in a ref
+    return (
+      <Geographies geography={geoUrl}>
+        {({ geographies }) =>
+          geographies.map((geo) => {
+            // Skip small islands and territories when zoomed out
+            if (position.zoom < 2 && geo.properties.area && parseFloat(geo.properties.area) < 20) {
+              return null;
+            }
+            
+            return (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                fill={getCountryColor(geo.properties.name)}
+                stroke={darkMode ? "#1f2937" : "#FFFFFF"}
+                strokeWidth={strokeWidth}
+                onClick={(event) => handleCountryClick(geo, event)}
+                onMouseMove={(event) => handleCountryHover(geo, event)}
+                onMouseLeave={handleMouseLeave}
+                style={{
+                  default: { outline: "none" },
+                  hover: { outline: "none", filter: "brightness(0.9)" },
+                  pressed: { outline: "none" },
+                }}
+              />
+            );
+          })
+        }
+      </Geographies>
+    );
+  });
 
   return (
     <div 
@@ -621,53 +655,27 @@ const InteractiveMap = ({ onCountryClick }: InteractiveMapProps) => {
           onMoveEnd={handleMoveEnd}
           filterZoomEvent={(evt: any) => evt.type === 'wheel' ? !evt.ctrlKey : true}
           translateExtent={[
-            [-400, -200], // [xMin, yMin] - Adjust these values as needed
-            [2000, 1200],  // [xMax, yMax] - Adjust these values as needed
+            [-400, -200],
+            [2000, 1200],
           ]}
         >
-          <Geographies geography={geoUrl}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
-                // Skip small islands and territories when zoomed out
-                if (position.zoom < 2 && geo.properties.area && parseFloat(geo.properties.area) < 20) {
-                  return null;
-                }
-                
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    fill={getCountryColor(geo.properties.name)}
-                    stroke={darkMode ? "#1f2937" : "#FFFFFF"}
-                    strokeWidth={strokeWidth}
-                    onClick={(event) => handleCountryClick(geo, event)}
-                    onMouseMove={(event) => handleCountryHover(geo, event)}
-                    onMouseLeave={handleMouseLeave}
-                    style={{
-                      default: { outline: "none" },
-                      hover: { outline: "none", filter: "brightness(0.9)" },
-                      pressed: { outline: "none" },
-                    }}
-                  />
-                );
-              })
-            }
-          </Geographies>
+          <MapGeographies projection={mapProjectionRef.current} /> // Pass the new component here
         </ZoomableGroup>
       </ComposableMap>
 
       {/* Render all tooltips (both hover and pinned) */}
       {tooltips.map((tooltip, index) => 
-        tooltip.visible && (
+        tooltip.visible && mapProjectionRef.current && ( // Only render if projection is available
           <CountryTooltip
             key={`${tooltip.country.countryId}-${index}`}
             country={tooltip.country}
-            x={tooltip.x}
-            y={tooltip.y}
+            coordinates={tooltip.coordinates}
             darkMode={darkMode}
             isPinned={tooltip.isPinned}
             onPin={() => togglePinTooltip(tooltip.country.countryId)}
             mapRef={mapContainerRef}
+            projection={mapProjectionRef.current} // Pass the projection function
+            position={position} // Pass the current map position and zoom
           />
         )
       )}

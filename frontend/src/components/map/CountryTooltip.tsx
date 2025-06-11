@@ -3,6 +3,7 @@ import { Pill, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatPrice } from "@/lib/utils";
 import FlagIcon from "@/components/flags/FlagIcon";
+import { geoMercator } from 'd3-geo';
 
 interface CountryTooltipProps {
   country: {
@@ -18,89 +19,85 @@ interface CountryTooltipProps {
     iso_code?: string;
     bgColor?: string;
   };
-  x: number;
-  y: number;
+  coordinates: [number, number]; // [longitude, latitude]
   darkMode: boolean;
   isPinned: boolean;
   onPin: () => void;
   mapRef?: React.RefObject<HTMLDivElement>;
+  projection: any; // The D3 projection function from react-simple-maps
+  position: { // Add position prop
+    coordinates: [number, number];
+    zoom: number;
+  };
 }
 
-export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({ 
-  country, 
-  x, 
-  y, 
+export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
+  country,
+  coordinates,
   darkMode,
   isPinned,
   onPin,
-  mapRef
+  mapRef,
+  projection,
+  position // Destructure position here
 }) => {
   const [convertedPrice, setConvertedPrice] = useState<number | null>(null);
   const [originalPrice, setOriginalPrice] = useState<number | null>(null);
   const [isConverting, setIsConverting] = useState<boolean>(false);
-  const [position, setPosition] = useState({ x, y });
+  const [screenPosition, setScreenPosition] = useState({ x: 0, y: 0 });
   
-  // Calculate position to ensure tooltip stays visible within the viewport
-  // This function will be called initially and when the map moves
-  const updatePosition = useCallback(() => {
-    if (!mapRef?.current) {
-      return;
-    }
-    
-    // Get map dimensions and position
-    const mapRect = mapRef.current.getBoundingClientRect();
-    
-    // Define tooltip width and height (approximate)
-    const tooltipWidth = 220;
-    const tooltipHeight = 120;
-    
-    // Calculate safe coordinates to keep tooltip within map boundaries
-    const safeX = Math.min(
-      Math.max(x, mapRect.left + tooltipWidth/2 + 10), 
-      mapRect.right - tooltipWidth/2 - 10
-    );
-    
-    const safeY = Math.min(
-      Math.max(y - 20, mapRect.top + tooltipHeight/2), 
-      mapRect.bottom - tooltipHeight - 10
-    );
-    
-    setPosition({ x: safeX, y: safeY });
-  }, [x, y, mapRef]);
-
-  // Update position when props change or map moves
+  // Update screen position whenever map projection changes or coordinates change
   useEffect(() => {
-    updatePosition();
-    
-    // Add event listeners to track map movement and resize
-    const handleMapMove = () => updatePosition();
-    window.addEventListener('resize', updatePosition);
-    
-    if (mapRef?.current) {
-      mapRef.current.addEventListener('mousemove', handleMapMove);
-      mapRef.current.addEventListener('wheel', handleMapMove);
-      mapRef.current.addEventListener('drag', handleMapMove);
-    }
-    
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      if (mapRef?.current) {
-        mapRef.current.removeEventListener('mousemove', handleMapMove);
-        mapRef.current.removeEventListener('wheel', handleMapMove);
-        mapRef.current.removeEventListener('drag', handleMapMove);
-      }
+    const updateScreenPosition = () => {
+      if (!projection || !mapRef?.current) return;
+
+      // Project the geographic coordinates to screen coordinates
+      const [x, y] = projection(coordinates) || [0, 0];
+      
+      // Get map dimensions for clamping
+      const mapRect = mapRef.current.getBoundingClientRect();
+      
+      // Define tooltip dimensions
+      const tooltipWidth = 220; // Approximate width
+      const tooltipHeight = 120; // Approximate height
+      
+      // Clamp coordinates to keep tooltip within map bounds
+      // Adjusting for the tooltip to be above the point, so y - height
+      const clampedX = Math.min(
+        Math.max(x, tooltipWidth / 2 + 10),
+        mapRect.width - tooltipWidth / 2 - 10
+      );
+      
+      // Keep the tooltip above the point. Subtract tooltip height from y.
+      const clampedY = Math.min(
+        Math.max(y - tooltipHeight - 10, 10), // At least 10px from top
+        mapRect.height - tooltipHeight / 2 - 10 // At least 10px from bottom (half height for centering)
+      );
+      
+      setScreenPosition({ x: clampedX, y: clampedY });
     };
-  }, [x, y, isPinned, mapRef, updatePosition]);
+
+    updateScreenPosition();
+    
+    // No need for separate map move listeners, as projection updates trigger this effect
+    // window.addEventListener('resize', updateScreenPosition); // Keep resize listener
+    const handleResize = () => updateScreenPosition();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [coordinates, projection, mapRef, position.coordinates, position.zoom]); // Add position dependencies here
   
   const positionStyle: React.CSSProperties = {
     position: 'absolute',
-    left: `${position.x}px`, 
-    top: `${position.y}px`,
-    transform: 'translate(-50%, -110%)',
-    zIndex: isPinned ? 30 : 20, 
+    left: `${screenPosition.x}px`,
+    top: `${screenPosition.y}px`,
+    transform: 'translate(-50%, -100%)', // Adjust to place tooltip above the point
+    zIndex: isPinned ? 30 : 20,
     pointerEvents: 'auto'
   };
-  
+
   // Calculate price change in local currency (for arrow/percent)
   const calculateLocalPriceChange = () => {
     // Use originalPrice (local currency) and previousPrice (local currency)

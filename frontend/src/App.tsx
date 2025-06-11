@@ -18,6 +18,7 @@ const CountryStats = lazy(() => import("@/pages/CountryStats"));
 const CountryProfile = lazy(() => import("@/pages/CountryProfile"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Stats = lazy(() => import("./pages/Stats"));
 
 // Loading fallback component
 const Loading = () => (
@@ -75,6 +76,7 @@ const App = () => (
                           <Route path="/profile" element={<ProfilePage />} />
                           <Route path="/admin" element={<Admin />} />
                           <Route path="/country/:countryId/stats" element={<CountryStats />} />
+                          <Route path="/stats" element={<Stats />} />
                         </Route>
 
                         {/* Fallback route for paths within the AuthProvider scope that don't match */}

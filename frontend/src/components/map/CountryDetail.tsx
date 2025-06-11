@@ -1,30 +1,28 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, convertToUSD, getCurrencyRate } from "@/lib/api";
-import { InfoIcon, DollarSign, BarChart4, AlertTriangle, Calendar, HelpCircle, TrendingUp, TrendingDown } from "lucide-react";
+import { api, getCurrencyRate } from "@/lib/api";
+import { InfoIcon, AlertTriangle, Calendar, TrendingUp, TrendingDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useMapContext } from "@/contexts/MapContext";
-import { format, startOfMonth, endOfMonth, parseISO, subMonths } from "date-fns";
+import { subMonths, parseISO, format } from "date-fns";
 
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MonthPicker } from "@/components/datepicker/MonthPicker";
+
+// Import our new components and utilities
+import { DetailHeader } from "@/components/common/DetailHeader";
+import { CurrencyToggle } from "@/components/common/CurrencyToggle";
+import { LoadingState } from "@/components/common/LoadingState";
+import { HistoryChart } from "@/components/common/HistoryChart";
+import { CountryHistoryModal } from "@/components/common/CountryHistoryModal";
+import { getDateParam, getCurrentSelectionLabel } from "@/utils/dateUtils";
+import { getCurrencySymbol, formatPrice } from "@/utils/currencyUtils";
+import { CountryDetails, CountryMedicineData, PriceChange } from "@/types";
+import useMediaQuery from "@/hooks/useMediaQuery";
 
 interface CountryDetailProps {
   countryId: string | null;
@@ -33,249 +31,133 @@ interface CountryDetailProps {
 
 export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose }) => {
   const { isAuthenticated } = useAuth();
-  const [showLocalCurrency, setShowLocalCurrency] = useState(true); // Default to local currency
+  const [showLocalCurrency, setShowLocalCurrency] = useState(false);
   const [conversionRate, setConversionRate] = useState<number>(1);
-  const [currencySymbol, setCurrencySymbol] = useState<string>('$');
-  const [currencyCode, setCurrencyCode] = useState<string>('USD');
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
-  const navigate = useNavigate();
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const calendarButtonRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   
   const { 
     selectedDate, 
-    setSelectedDate,
     dateRange,
-    setDateRange,
     selectedMonth,
     setSelectedMonth,
     isMonthAvailable,
     availableMonths
   } = useMapContext();
 
-  // Debug logging
-  useEffect(() => {
-    console.log("CountryDetail rendered with countryId:", countryId);
-    console.log("Date filters:", { selectedDate, dateRange, selectedMonth });
-  }, [countryId, selectedDate, dateRange, selectedMonth]);
-  
-  // Get formatted label for current selection
-  const getCurrentSelectionLabel = () => {
-    if (!selectedMonth || selectedMonth === "all") {
-      return "All Time";
-    }
-    
-    try {
-      const date = parseISO(selectedMonth);
-      return format(date, 'MMMM yyyy');
-    } catch (e) {
-      console.error("Error parsing date:", e);
-      return "All Time";
-    }
-  };
-
-  // Prepare date parameter for API calls
-  const getDateParam = () => {
-    let dateParam = '';
-    if (selectedDate) {
-      const formattedDate = selectedDate.toISOString().split('T')[0];
-      dateParam = `?date=${formattedDate}`;
-    } else if (dateRange && dateRange.from) {
-      const from = dateRange.from.toISOString().split('T')[0];
-      const to = dateRange.to ? dateRange.to.toISOString().split('T')[0] : '';
-      dateParam = `?start=${from}${to ? `&end=${to}` : ''}`;
-    } else if (selectedMonth && selectedMonth !== 'all') {
-      dateParam = `?month=${selectedMonth}`;
-    }
-    return dateParam;
-  };
-
   // Calculate previous month string for API calls
   const getPreviousMonthParam = () => {
-    if (!selectedMonth || selectedMonth === 'all') {
-      return ''; // No previous month to compare if no specific month is selected
-    }
+    if (!selectedMonth || selectedMonth === 'all') return '';
     try {
-      const currentDate = parseISO(selectedMonth + '-01'); // Parse as first day of the month
+      const currentDate = parseISO(selectedMonth + '-01');
       const prevDate = subMonths(currentDate, 1);
       return `?month=${format(prevDate, 'yyyy-MM')}`;
     } catch (e) {
       console.error("Error calculating previous month:", e);
-      return ''; // Return empty string on error
+      return '';
     }
   };
 
+  // Fetch country details
   const { data: countryDetails, isLoading } = useQuery({
     queryKey: ["countryDetails", countryId, selectedDate, dateRange, selectedMonth],
     queryFn: async () => {
       if (!countryId) return null;
-      console.log(`Fetching details for country ID: ${countryId}`);
-      try {
-        const dateParam = getDateParam();
-        const response = await api.get(`/country/${countryId}/details${dateParam}`);
-        console.log("Country details API response:", response.data);
-        return response.data;
-      } catch (error) {
-        console.error("Error fetching country details:", error);
-        return null;
-      }
+      const dateParam = getDateParam(selectedDate, dateRange, selectedMonth);
+      const response = await api.get(`/country/${countryId}/details${dateParam}`);
+      return response.data as CountryDetails;
     },
     enabled: !!countryId && isAuthenticated,
   });
 
-  // Fetch previous month's data for comparison
+  // Fetch previous month's data
   const previousMonthParam = getPreviousMonthParam();
-  const { data: previousMonthCountryData, isLoading: isLoadingPreviousMonth } = useQuery({
+  const { data: previousMonthCountryData } = useQuery({
     queryKey: ["previousMonthCountryData", countryId, previousMonthParam],
     queryFn: async () => {
       if (!countryId || !previousMonthParam) return null;
-      console.log(`Fetching previous month details for country ID: ${countryId}`);
-      try {
-        // Using the /countries-average-prices endpoint to get previous month data for the specific country
-        const response = await api.get(`/countries-average-prices${previousMonthParam}`);
-        // Find the data for the current country
-        const countryData = response.data.find((c: any) => String(c.countryId) === String(countryId));
-        console.log("Previous month country data API response:", countryData);
-        return countryData || null; // Return found country data or null
-      } catch (error) {
-        console.error("Error fetching previous month country data:", error);
-        return null;
-      }
+      const response = await api.get(`/countries-average-prices${previousMonthParam}`);
+      const countryData = response.data.find((c: CountryMedicineData) => String(c.id) === String(countryId));
+      return countryData || null;
     },
-    // Only enable if countryId is available, authenticated, and a previous month is calculable
     enabled: !!countryId && isAuthenticated && !!previousMonthParam,
   });
 
+  // Fetch top medicines
   const { data: topMedicines = [], isLoading: isLoadingMedicines } = useQuery({
     queryKey: ["topMedicines", countryId, selectedDate, dateRange, selectedMonth],
     queryFn: async () => {
       if (!countryId) return [];
-      const dateParam = getDateParam();
+      const dateParam = getDateParam(selectedDate, dateRange, selectedMonth);
       const response = await api.get(`/country/${countryId}/top-medicines${dateParam}`);
       return response.data;
     },
     enabled: !!countryId && isAuthenticated,
   });
 
-  // Function to get currency symbol for a currency code
-  const getCurrencySymbol = (currencyCode: string): string => {
-    const currencySymbols: Record<string, string> = {
-      // Major world currencies
-      'USD': '$',        // US Dollar
-      'EUR': '€',        // Euro
-      'GBP': '£',        // British Pound
-      'JPY': '¥',        // Japanese Yen
-      'CNY': '¥',        // Chinese Yuan
-      
-      // Latin America
-      'BRL': 'R$',       // Brazilian Real
-      'MXN': '$',        // Mexican Peso
-      'ARS': '$',        // Argentine Peso
-      'CLP': '$',        // Chilean Peso
-      'COP': '$',        // Colombian Peso
-      'PEN': 'S/',       // Peruvian Sol
-      'UYU': '$U',       // Uruguayan Peso
-      'VES': 'Bs.',      // Venezuelan Bolivar
-      'BOB': 'Bs.',      // Bolivian Boliviano
-      'PYG': '₲',        // Paraguayan Guarani
-      
-      // Other currencies
-      'CAD': 'C$',       // Canadian Dollar
-      'CHF': 'Fr.',      // Swiss Franc
-      'RUB': '₽',        // Russian Ruble
-      'PLN': 'zł',       // Polish Zloty
-      'TRY': '₺',        // Turkish Lira
-      'SEK': 'kr',       // Swedish Krona
-      'NOK': 'kr',       // Norwegian Krone
-      'DKK': 'kr',       // Danish Krone
-      'CZK': 'Kč',       // Czech Koruna
-      'HUF': 'Ft',       // Hungarian Forint
-      'RON': 'lei',      // Romanian Leu
-      'INR': '₹',        // Indian Rupee
-      'KRW': '₩',        // South Korean Won
-      'AUD': 'A$',       // Australian Dollar
-      'NZD': 'NZ$',      // New Zealand Dollar
-      'SGD': 'S$',       // Singapore Dollar
-      'HKD': 'HK$',      // Hong Kong Dollar
-      'THB': '฿',        // Thai Baht
-      'PHP': '₱',        // Philippine Peso
-      'IDR': 'Rp',       // Indonesian Rupiah
-      'MYR': 'RM',       // Malaysian Ringgit
-      'VND': '₫',        // Vietnamese Dong
-      'ZAR': 'R',        // South African Rand
-      'SAR': '﷼',        // Saudi Riyal
-      'AED': 'د.إ',      // UAE Dirham
-      'EGP': 'E£',       // Egyptian Pound
-      'NGN': '₦',        // Nigerian Naira
-      'KES': 'KSh',      // Kenyan Shilling
-      'MAD': 'د.م.',     // Moroccan Dirham
-    };
-    
-    return currencySymbols[currencyCode] || currencyCode;
-  };
-
-  // Fetch currency conversion rate when country details changes
+  // Fetch currency conversion rate
   useEffect(() => {
     const fetchCurrencyRate = async () => {
       if (countryDetails?.currency && countryDetails?.currency !== 'USD') {
         try {
-          // Ensure we're using the same conversion logic as everywhere else
           const rate = await getCurrencyRate(countryDetails.currency, 'USD');
           setConversionRate(rate);
-          
-          // Set the currency symbol based on currency code
-          setCurrencySymbol(getCurrencySymbol(countryDetails.currency));
-          setCurrencyCode(countryDetails.currency);
         } catch (error) {
           console.error('Error fetching currency rate:', error);
           setConversionRate(1);
-          setCurrencySymbol('$');
-          setCurrencyCode('USD');
         }
       } else {
         setConversionRate(1);
-        setCurrencySymbol('$');
-        setCurrencyCode('USD');
       }
     };
     
     fetchCurrencyRate();
   }, [countryDetails]);
 
-  // Format price with appropriate currency
-  const formatPrice = (price: any): string => {
-    if (price === undefined || price === null) {
-      return "N/A";
-    }
-    
-    // Handle non-numeric values
-    if (typeof price !== 'number') {
-      const numericPrice = parseFloat(String(price));
-      if (isNaN(numericPrice)) {
-        return "N/A";
-      }
-      price = numericPrice;
-    }
-    
-    // Apply conversion if needed using the consistent conversion rate
-    if (!showLocalCurrency && countryDetails?.currency && countryDetails?.currency !== 'USD') {
-      const convertedPrice = price * conversionRate;
-      return convertedPrice.toFixed(2);
-    }
-    
-    return price.toFixed(2);
-  };
+  // Fetch historical price data
+  const { data: historicalPrices, isLoading: isLoadingHistorical } = useQuery({
+    queryKey: ["historicalCountryPrices", countryId],
+    queryFn: async () => {
+      if (!countryId) return [];
+      const response = await api.get(`/comparison/country/${countryId}/historical-prices`);
+      return response.data;
+    },
+    enabled: !!countryId && isAuthenticated,
+  });
 
-  // Function to open auth modal
-  const openAuthModal = () => {
-    const event = new CustomEvent('open-auth-modal', { 
-      detail: { type: 'login' } 
-    });
-    window.dispatchEvent(event);
-  };
+  // Prepare data for the chart
+  const chartData = React.useMemo(() => {
+    if (!historicalPrices || historicalPrices.length === 0) {
+      return { labels: [], datasets: [] };
+    }
 
-  // Calculate price change percentage for a medicine if previous price exists
-  const calculatePriceChange = (currentPrice?: number | null, previousPrice?: number | null) => {
-    // Ensure both current and previous prices are valid numbers and previous price is not zero
+    const sortedData = [...historicalPrices].sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
+    const labels = sortedData.map((item: any) => format(parseISO(item.month + '-01'), 'MMM yyyy'));
+    // Convert historical prices to USD using the fetched conversion rate
+    const pricesInUsd = sortedData.map((item: any) => item.average_price * conversionRate);
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Average Price (USD)',
+          data: pricesInUsd,
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+          tension: 0.1,
+        },
+      ],
+    };
+  }, [historicalPrices, conversionRate]);
+
+  // Determine if screen is large for modal display (using Tailwind's md breakpoint)
+  const isLargeScreen = useMediaQuery('(min-width: 768px)');
+
+  // Calculate price change percentage
+  const calculatePriceChange = (currentPrice?: number | null, previousPrice?: number | null): PriceChange | null => {
     if (currentPrice != null && previousPrice != null && !isNaN(currentPrice) && !isNaN(previousPrice) && previousPrice > 0) {
       const change = ((currentPrice - previousPrice) / previousPrice) * 100;
       return {
@@ -287,9 +169,12 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
     return null;
   };
 
-  // Safely display currency value with proper formatting
-  const displayCurrencyValue = (value: any): React.ReactNode => {
-    return formatPrice(value);
+  // Function to open auth modal
+  const openAuthModal = () => {
+    const event = new CustomEvent('open-auth-modal', { 
+      detail: { type: 'login' } 
+    });
+    window.dispatchEvent(event);
   };
 
   return (
@@ -300,12 +185,10 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
         className="w-full sm:max-w-md overflow-y-auto bg-background dark:bg-background border dark:border-border overflow-hidden" 
         side="right"
       >
-        <SheetHeader className="pb-4">
-          <SheetTitle>{countryDetails?.name || "Country Details"}</SheetTitle>
-          <SheetDescription>
-            Medicine pricing and consumption details
-          </SheetDescription>
-        </SheetHeader>
+        <DetailHeader 
+          title={countryDetails?.name || "Country Details"}
+          description="Medicine pricing and consumption details"
+        />
 
         {!isAuthenticated ? (
           <div className="space-y-4 my-6">
@@ -321,12 +204,10 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
             </Button>
           </div>
         ) : isLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <p>Loading country details...</p>
-          </div>
+          <LoadingState message="Loading country details..." />
         ) : countryDetails ? (
           <div className="space-y-6">
-            {/* Month selector with tooltip */}
+            {/* Month selector */}
             <div className="flex items-center gap-2">
               <div 
                 ref={calendarButtonRef} 
@@ -334,7 +215,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                 onClick={() => setMonthPickerOpen(!monthPickerOpen)}
               >
                 <Calendar className="h-4 w-4" />
-                <div className="flex-1 text-sm">{getCurrentSelectionLabel()}</div>
+                <div className="flex-1 text-sm">{getCurrentSelectionLabel(selectedMonth)}</div>
               </div>
               
               <TooltipProvider>
@@ -355,7 +236,6 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
               </TooltipProvider>
             </div>
             
-            {/* Month picker popup */}
             <MonthPicker 
               isOpen={monthPickerOpen} 
               onClose={() => setMonthPickerOpen(false)} 
@@ -364,32 +244,50 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
             />
           
             {countryDetails.currency && countryDetails.currency !== 'USD' && (
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="flex-1">
-                  <Label htmlFor="currency-toggle" className="flex items-center space-x-2">
-                    <DollarSign className="h-4 w-4" />
-                    <span>Show in {showLocalCurrency ? countryDetails.currency : 'USD'}</span>
-                  </Label>
-                </div>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center">
-                        <Switch
-                          id="currency-toggle"
-                          checked={!showLocalCurrency}
-                          onCheckedChange={(checked) => setShowLocalCurrency(!checked)}
-                        />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" align="center">
-                      <p>Toggle between local currency and USD</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+              <CurrencyToggle
+                showLocalCurrency={showLocalCurrency}
+                onToggle={setShowLocalCurrency}
+                localCurrencyCode={countryDetails.currency}
+              />
             )}
             
+            {/* Historical Price Chart Section */}
+            {chartData.labels.length > 0 && (
+              <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
+                 <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                  Historical Average Price
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-help">
+                          <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[250px]">
+                        <p>Average price of medicines over time in {countryDetails.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </h3>
+                {isLargeScreen ? (
+                  <Button 
+                    onClick={() => setIsHistoryModalOpen(true)} 
+                    className="w-full"
+                    variant="ghost"
+                  >
+                    View Historical Graph
+                  </Button>
+                ) : isLoadingHistorical ? (
+                   <LoadingState message="Loading historical data..." />
+                ) : (
+                   <div style={{ height: '300px' }}>
+                      <HistoryChart data={chartData} title="Average Price History" yAxisLabel="Price (USD)" />
+                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Overview Section */}
             <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
               <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                 Overview
@@ -432,50 +330,44 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                 <div className="flex flex-col">
                   <span className="text-sm text-muted-foreground">Average Package Price</span>
                   <div className="font-medium flex items-center">
-                    {showLocalCurrency ? currencySymbol : '$'}
-                    {displayCurrencyValue(countryDetails.avg_price)}
-                    {/* Price change indicator with arrow icon (only icon inline) */}
+                    {showLocalCurrency ? getCurrencySymbol(countryDetails.currency) : '$'}
+                    {formatPrice(
+                      countryDetails.avg_price,
+                      countryDetails.currency,
+                      showLocalCurrency,
+                      conversionRate
+                    )}
                     {(() => {
-                      // Use the previous month's average price from the newly fetched data
-                      const previousAvgPrice = previousMonthCountryData?.averagePrice;
-                      const priceChange = calculatePriceChange(countryDetails.avg_price, previousAvgPrice);
-                      return priceChange ? (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className={`ml-1 flex items-center ${
-                                priceChange.increased ? 'text-red-500' : 'text-emerald-500'
-                              }`}>
-                                {priceChange.increased ? (
-                                  <TrendingUp className="h-4 w-4" />
-                                ) : (
-                                  <TrendingDown className="h-4 w-4" />
-                                )}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              <p>
-                                {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="ml-1 cursor-help text-muted-foreground flex items-center">
-                                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-card dark:bg-card text-foreground dark:text-foreground border dark:border-border text-xs">
-                              <p>No previous price data</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                      const priceChange = calculatePriceChange(
+                        countryDetails.avg_price,
+                        previousMonthCountryData?.avg_price
                       );
+                      return priceChange ? (
+                        <span className={`ml-2 flex items-center text-sm ${ 
+                          priceChange.increased ? 'text-red-500' : 'text-emerald-500'
+                        }`}>
+                          {priceChange.increased ? (
+                            <TrendingUp className="h-4 w-4 mr-1" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 mr-1" />
+                          )}
+                          {priceChange.percentage}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <InfoIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                <p>
+                                  {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage} since previous month
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </span>
+                      ) : null;
                     })()}
-                    {(countryDetails.using_reference_price > 0) && (
+                    {countryDetails.using_reference_price > 0 && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -483,29 +375,18 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                               <AlertTriangle className="h-4 w-4 text-amber-500" />
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent className="bg-card dark:bg-card text-foreground dark:text-foreground border dark:border-border">
+                          <TooltipContent>
                             <p>No sales price available. Using reference price.</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     )}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="cursor-help">
-                            <InfoIcon className="ml-1 h-3 w-3 text-muted-foreground" />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[250px]">
-                          <p>Average price per package across all medicines</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Top Medicines Section */}
             <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
               <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                 Top Medicines
@@ -523,14 +404,17 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                 </TooltipProvider>
               </h3>
               {isLoadingMedicines ? (
-                <p className="text-center py-2">Loading medicines...</p>
+                <LoadingState message="Loading medicines..." />
               ) : (
                 <div className="space-y-3">
                   {topMedicines.map((medicine: any) => {
-                    // Find the corresponding medicine in the previous month's data to get its price
-                    const previousMedicine = previousMonthCountryData?.topMedicines?.find((prevMed: any) => prevMed.name === medicine.name);
-                    const previousPrice = previousMedicine?.averagePrice;
-                    const priceChange = calculatePriceChange(medicine.averagePrice, previousPrice);
+                    const previousMedicine = previousMonthCountryData?.topMedicines?.find(
+                      (prevMed: any) => prevMed.name === medicine.name
+                    );
+                    const priceChange = calculatePriceChange(
+                      medicine.averagePrice,
+                      previousMedicine?.averagePrice
+                    );
                     
                     return (
                       <div key={medicine.name} className="border-b dark:border-border pb-2 last:border-0">
@@ -538,48 +422,41 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                           <span className="font-medium">{medicine.name}</span>
                           <div className="flex items-center">
                             <span>
-                              {showLocalCurrency ? currencySymbol : '$'}
-                              {displayCurrencyValue(medicine.averagePrice)}
+                              {showLocalCurrency ? getCurrencySymbol(countryDetails.currency) : '$'}
+                              {formatPrice(
+                                medicine.averagePrice,
+                                countryDetails.currency,
+                                showLocalCurrency,
+                                conversionRate
+                              )}
                             </span>
                             
-                            {/* Price change indicator with arrow icon (only icon inline) */}
-                            {priceChange ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className={`ml-1 flex items-center ${
-                                      priceChange.increased ? 'text-red-500' : 'text-emerald-500'
-                                    }`}>
-                                      {priceChange.increased ? (
-                                        <TrendingUp className="h-4 w-4" />
-                                      ) : (
-                                        <TrendingDown className="h-4 w-4" />
-                                      )}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="text-xs">
-                                    <p>
-                                      {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="ml-1 cursor-help text-muted-foreground flex items-center">
-                                      <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="bg-card dark:bg-card text-foreground dark:text-foreground border dark:border-border text-xs">
-                                    <p>No previous price data</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                            {priceChange && (
+                              <span className={`ml-2 flex items-center text-sm ${ 
+                                priceChange.increased ? 'text-red-500' : 'text-emerald-500'
+                              }`}>
+                                {priceChange.increased ? (
+                                  <TrendingUp className="h-4 w-4 mr-1" />
+                                ) : (
+                                  <TrendingDown className="h-4 w-4 mr-1" />
+                                )}
+                                {priceChange.percentage}
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <InfoIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      <p>
+                                        {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage} since previous month
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </span>
                             )}
                             
-                            {(medicine.using_reference_price > 0) && (
+                            {medicine.using_reference_price > 0 && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -587,7 +464,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
                                       <AlertTriangle className="h-4 w-4 text-amber-500" />
                                     </div>
                                   </TooltipTrigger>
-                                  <TooltipContent className="bg-card dark:bg-card text-foreground dark:text-foreground border dark:border-border">
+                                  <TooltipContent>
                                     <p>No sales price available. Using reference price.</p>
                                   </TooltipContent>
                                 </Tooltip>
@@ -638,11 +515,19 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
             )}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-32">
-            <p>No country details available</p>
-          </div>
+          <LoadingState message="No country details available" />
         )}
       </SheetContent>
+
+      {/* Render modal for large screens */}
+      {isLargeScreen && countryDetails && (
+        <CountryHistoryModal 
+          isOpen={isHistoryModalOpen} 
+          onClose={() => setIsHistoryModalOpen(false)} 
+          chartData={chartData} 
+          countryName={countryDetails.name}
+        />
+      )}
     </Sheet>
   );
 };

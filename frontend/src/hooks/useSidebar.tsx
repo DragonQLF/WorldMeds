@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Settings, Shield, BarChart4, GitCompare } from "lucide-react";
+import { LayoutDashboard, Settings, Shield, BarChart4, GitCompare, LineChart } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -25,6 +25,12 @@ export const useSidebar = () => {
       label: "Dashboard",
       href: "/",
       icon: LayoutDashboard,
+    },
+    {
+      label: "Stats",
+      href: "/stats",
+      icon: LineChart,
+      requiresAuth: true,
     },
     {
       label: "Admin",

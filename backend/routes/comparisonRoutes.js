@@ -39,6 +39,40 @@ router.get("/available-months", (req, res) => {
   });
 });
 
+// Get historical average prices for a country by month
+router.get("/country/:id/historical-prices", (req, res) => {
+  const countryId = req.params.id;
+  
+  // Basic validation
+  if (!countryId || isNaN(countryId)) {
+    return res.status(400).json({ error: "Invalid country ID" });
+  }
+
+  const sql = `
+    SELECT 
+      DATE_FORMAT(month, '%Y-%m') as month,
+      AVG(COALESCE(sale_price, reference_price)) as average_price
+    FROM medicine_countries
+    WHERE country_id = ? AND month IS NOT NULL
+    GROUP BY DATE_FORMAT(month, '%Y-%m')
+    ORDER BY month ASC
+  `;
+
+  db.query(sql, [countryId], (err, results) => {
+    if (err) {
+      console.error(`Error fetching historical prices for country ${countryId}:`, err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    // Ensure average_price is a number
+    const formattedResults = results.map(row => ({
+      month: row.month,
+      average_price: parseFloat(row.average_price) || 0
+    }));
+
+    res.json(formattedResults);
+  });
+});
+
 // Search countries endpoint - FIXED: proper filtering and parameter handling
 router.get("/countries", (req, res) => {
   console.log('[REQ] /api/comparison/countries', { query: req.query, body: req.body });
@@ -106,15 +140,11 @@ router.get("/countries", (req, res) => {
         SELECT AVG(COALESCE(mc.sale_price, mc.reference_price))
         FROM medicine_countries mc
         WHERE mc.country_id = c.id
-        ${dateFilter}
-        ${medicineFilter}
       ) AS averagePrice,
       (
         SELECT COUNT(DISTINCT mc.medicine_id)
         FROM medicine_countries mc
         WHERE mc.country_id = c.id
-        ${dateFilter}
-        ${medicineFilter}
       ) AS totalMedicines
     FROM countries c
     ${finalWhereClause}
@@ -181,9 +211,44 @@ router.get("/countries", (req, res) => {
   });
 });
 
+// Get historical global average prices for a medicine by month
+router.get("/medicines/:id/historical-prices", (req, res) => {
+  const medicineId = req.params.id;
+  
+  // Basic validation
+  if (!medicineId || isNaN(medicineId)) {
+    return res.status(400).json({ error: "Invalid medicine ID" });
+  }
+
+  // We'll calculate the average price across all countries for this medicine by month
+  const sql = `
+    SELECT 
+      DATE_FORMAT(month, '%Y-%m') as month,
+      AVG(COALESCE(sale_price, reference_price)) as average_price_usd
+    FROM medicine_countries
+    WHERE medicine_id = ? AND month IS NOT NULL
+    GROUP BY DATE_FORMAT(month, '%Y-%m')
+    ORDER BY month ASC
+  `;
+
+  db.query(sql, [medicineId], (err, results) => {
+    if (err) {
+      console.error(`Error fetching historical prices for medicine ${medicineId}:`, err);
+      return res.status(500).json({ error: "Database error" });
+    }
+     // Ensure average_price_usd is a number
+    const formattedResults = results.map(row => ({
+      month: row.month,
+      average_price_usd: parseFloat(row.average_price_usd) || 0
+    }));
+
+    res.json(formattedResults);
+  });
+});
+
 // Search medicines endpoint - FIXED: proper filtering and parameter handling
 router.get("/medicines", (req, res) => {
-  const { q, countries, medicines, month, date, start, end } = req.query; // Added date/month params
+  const { q, countries, medicines, month, date, start, end } = req.query;
   let whereClause = "";
   let params = [];
   
@@ -196,7 +261,7 @@ router.get("/medicines", (req, res) => {
   // Build date filter for medicine filtering
   let dateFilter = "";
   let dateParams = [];
-   if (month && month !== 'all') {
+  if (month && month !== 'all') {
     dateFilter = "AND DATE_FORMAT(mc.month, '%Y-%m') = ?";
     dateParams.push(month);
   } else if (date) {
@@ -210,10 +275,10 @@ router.get("/medicines", (req, res) => {
     const formattedEnd = formatDateForQuery(end);
     if (formattedStart && formattedEnd) {
       dateFilter = "AND mc.month BETWEEN ? AND ?";
-      dateParams.push(`${formattedStart}-01`, `${formattedEnd}-01`); // Assuming month is stored as YYYY-MM-DD, use the first day of the month
-    } else if (formattedStart) { // Handle case with only start date for range
-        dateFilter = "AND mc.month >= ?";
-        dateParams.push(`${formattedStart}-01`);
+      dateParams.push(`${formattedStart}-01`, `${formattedEnd}-01`);
+    } else if (formattedStart) {
+      dateFilter = "AND mc.month >= ?";
+      dateParams.push(`${formattedStart}-01`);
     }
   }
   
@@ -237,7 +302,7 @@ router.get("/medicines", (req, res) => {
       }
       // Add date params for the subquery if present
       if (dateParams.length > 0) {
-          params.push(...dateParams);
+        params.push(...dateParams);
       }
     }
   }
@@ -258,43 +323,38 @@ router.get("/medicines", (req, res) => {
       }
     }
   }
-  
+
   const sql = `
-    SELECT 
+    SELECT DISTINCT
       m.id,
       m.name,
       m.dosage,
       (
-        SELECT AVG(COALESCE(mc.sale_price, mc.reference_price))
-        FROM medicine_countries mc
-        WHERE mc.medicine_id = m.id
-      ) AS averagePrice,
-      (
         SELECT COUNT(DISTINCT mc.country_id)
         FROM medicine_countries mc
         WHERE mc.medicine_id = m.id
-      ) AS countryCount
+        ${dateFilter}
+      ) as available_countries
     FROM medicines m
     ${whereClause}
     ORDER BY m.name
     LIMIT 20
   `;
-  
+
+  // Add date params for the available_countries subquery
+  if (dateParams.length > 0) {
+    params.push(...dateParams);
+  }
+
+  console.log('Executing SQL for /medicines:', sql);
+  console.log('Parameters for /medicines:', params);
+
   db.query(sql, params, (err, results) => {
     if (err) {
       console.error("Error searching medicines:", err);
       return res.status(500).json({ error: "Database error" });
     }
-    
-    const formattedResults = results.map(row => ({
-      id: row.id,
-      name: row.name,
-      dosage: row.dosage,
-      averagePrice: row.averagePrice ? parseFloat(row.averagePrice) : null,
-      countryCount: parseInt(row.countryCount) || 0
-    }));
-    
-    res.json(formattedResults);
+    res.json(results);
   });
 });
 
@@ -398,85 +458,108 @@ router.get("/all-medicines", (req, res) => {
 router.get("/compare", (req, res) => {
   const { medicines, countries, month, date } = req.query;
   
-  if (!medicines && !countries) {
-    return res.status(400).json({ error: "At least one medicine or country must be specified" });
+  if (!medicines || !countries) {
+    return res.status(400).json({ error: "Missing required parameters" });
   }
-  
-  let whereConditions = [];
-  let params = [];
-  
-  // Build filters
-  if (medicines) {
-    const medicineIds = medicines.split(',').filter(id => id.trim());
-    if (medicineIds.length > 0) {
-      const placeholders = medicineIds.map(() => '?').join(',');
-      whereConditions.push(`mc.medicine_id IN (${placeholders})`);
-      params.push(...medicineIds);
-    }
-  }
-  
-  if (countries) {
-    const countryIds = countries.split(',').filter(id => id.trim());
-    if (countryIds.length > 0) {
-      const placeholders = countryIds.map(() => '?').join(',');
-      whereConditions.push(`mc.country_id IN (${placeholders})`);
-      params.push(...countryIds);
-    }
-  }
-  
+
+  const medicineIds = medicines.split(',').filter(id => id.trim());
+  const countryIds = countries.split(',').filter(id => id.trim());
+
   // Build date filter
+  let dateFilter = "";
+  let dateParams = [];
   if (month && month !== 'all') {
-    whereConditions.push("DATE_FORMAT(mc.month, '%Y-%m') = ?");
-    params.push(month);
+    dateFilter = "AND DATE_FORMAT(mc.month, '%Y-%m') = ?";
+    dateParams.push(month);
   } else if (date) {
     const formattedDate = formatDateForQuery(date);
     if (formattedDate) {
-      whereConditions.push("DATE(mc.month) = ?");
-      params.push(formattedDate);
+      dateFilter = "AND DATE(mc.month) = ?";
+      dateParams.push(formattedDate);
     }
   }
-  
-  const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-  
-  const sql = `
+
+  // Get current prices
+  const currentPricesSql = `
     SELECT 
       m.id as medicine_id,
-      m.name as medicine_name,
-      m.dosage,
+      m.name as medicine,
       c.id as country_id,
-      c.name as country_name,
+      c.name as country,
       c.currency,
+      mc.sale_price as price,
       mc.month,
-      COALESCE(mc.sale_price, mc.reference_price) as price,
-      mc.quantity_purchased,
-      mc.pills_per_package
-    FROM medicine_countries mc
-    JOIN medicines m ON mc.medicine_id = m.id
-    JOIN countries c ON mc.country_id = c.id
-    ${whereClause}
-    ORDER BY m.name, c.name, mc.month DESC
+      mc.reference_price
+    FROM medicines m
+    CROSS JOIN countries c
+    LEFT JOIN medicine_countries mc ON mc.medicine_id = m.id AND mc.country_id = c.id
+    WHERE m.id IN (${medicineIds.map(() => '?').join(',')})
+    AND c.id IN (${countryIds.map(() => '?').join(',')})
+    ${dateFilter}
+    ORDER BY m.name, c.name
   `;
-  
-  db.query(sql, params, (err, results) => {
+
+  // Get historical prices for trend data
+  const trendDataSql = `
+    SELECT 
+      m.id as medicine_id,
+      c.id as country_id,
+      mc.sale_price as price,
+      mc.month,
+      c.currency
+    FROM medicines m
+    CROSS JOIN countries c
+    LEFT JOIN medicine_countries mc ON mc.medicine_id = m.id AND mc.country_id = c.id
+    WHERE m.id IN (${medicineIds.map(() => '?').join(',')})
+    AND c.id IN (${countryIds.map(() => '?').join(',')})
+    AND mc.month IS NOT NULL
+    ORDER BY mc.month DESC
+  `;
+
+  const currentParams = [...medicineIds, ...countryIds, ...dateParams];
+  const trendParams = [...medicineIds, ...countryIds];
+
+  // Execute both queries
+  db.query(currentPricesSql, currentParams, (err, currentResults) => {
     if (err) {
-      console.error("Error fetching comparison data:", err);
+      console.error("Error fetching current prices:", err);
       return res.status(500).json({ error: "Database error" });
     }
-    
-    const formattedResults = results.map(row => ({
-      medicineId: row.medicine_id,
-      medicineName: row.medicine_name,
-      dosage: row.dosage,
-      countryId: row.country_id,
-      countryName: row.country_name,
-      currency: row.currency,
-      month: row.month,
-      price: row.price ? parseFloat(row.price) : null,
-      quantity: parseInt(row.quantity_purchased) || 0,
-      pillsPerPackage: parseInt(row.pills_per_package) || 1
-    }));
-    
-    res.json(formattedResults);
+
+    db.query(trendDataSql, trendParams, (err, trendResults) => {
+      if (err) {
+        console.error("Error fetching trend data:", err);
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      // Process and combine the results
+      const processedData = currentResults.map(row => {
+        const trendData = trendResults
+          .filter(trend => 
+            trend.medicine_id === row.medicine_id && 
+            trend.country_id === row.country_id
+          )
+          .map(trend => ({
+            month: trend.month,
+            price: trend.price,
+            currency: trend.currency
+          }));
+
+        return {
+          medicine_id: row.medicine_id,
+          medicine: row.medicine,
+          country_id: row.country_id,
+          country: row.country,
+          price: row.price,
+          currency: row.currency,
+          month: row.month,
+          reference_price: row.reference_price,
+          trendData: trendData
+        };
+      });
+
+      res.json(processedData);
+    });
   });
 });
 

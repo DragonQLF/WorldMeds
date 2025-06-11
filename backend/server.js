@@ -7,6 +7,7 @@ const config = require('./config');
 const http = require('http');
 const { setupWebsocketServer } = require('./websocket');
 const { formatPrice, preparePriceData, convertToUSD, fetchCurrencyRates: fetchBackendCurrencyRates } = require('./utils/priceUtils');
+const logger = require('./utils/logger');
 
 const app = express();
 const port = config.PORT;
@@ -37,17 +38,21 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const comparisonRoutes = require('./routes/comparisonRoutes');
+const statsRoutes = require('./routes/statsRoutes');
 
 app.use('/api/admin', adminRoutes);
 
 // Comparison routes for medicine price comparison
 app.use('/api/comparison', comparisonRoutes);
 
+// Stats routes
+app.use('/api/stats', statsRoutes);
+
 // Public API endpoints - No authentication required
 
 // Search endpoints (Public)
 app.get("/api/search/countries", (req, res) => {
-  console.log('[REQ] /api/search/countries', { query: req.query, body: req.body });
+  logger.info('API Request: /api/search/countries', { query: req.query, body: req.body });
   const searchTerm = req.query.q || '';
   let dateFilter = '';
   let params = [];
@@ -140,7 +145,7 @@ app.get("/api/search/countries", (req, res) => {
 
   db.query(sql, queryParams, (err, results) => {
     if (err) {
-      console.error("Error searching countries:", err);
+      logger.error("Error searching countries:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     const formattedResults = results.map(row => ({
@@ -158,7 +163,7 @@ app.get("/api/search/countries", (req, res) => {
 });
 
 app.get("/api/search/medicines", (req, res) => {
-  console.log('[REQ] /api/search/medicines', { query: req.query, body: req.body });
+  logger.info('API Request: /api/search/medicines', { query: req.query, body: req.body });
   const searchTerm = req.query.q || '';
   
   if (!searchTerm || searchTerm.length < 2) {
@@ -166,16 +171,24 @@ app.get("/api/search/medicines", (req, res) => {
   }
   
   const sql = `
-    SELECT id, name, dosage 
-    FROM medicines 
-    WHERE name LIKE ? 
-    ORDER BY name 
+    SELECT DISTINCT
+      m.id,
+      m.name,
+      m.dosage,
+      (
+        SELECT COUNT(DISTINCT mc.country_id)
+        FROM medicine_countries mc
+        WHERE mc.medicine_id = m.id
+      ) as available_countries
+    FROM medicines m
+    WHERE m.name LIKE ?
+    ORDER BY m.name
     LIMIT 20
   `;
   
   db.query(sql, [`%${searchTerm}%`], (err, results) => {
     if (err) {
-      console.error("Error searching medicines:", err);
+      logger.error("Error searching medicines:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
@@ -184,26 +197,26 @@ app.get("/api/search/medicines", (req, res) => {
 
 // NEW Endpoint to provide currency rates to the frontend
 app.get("/api/currency-rates", async (req, res) => {
-  console.log('[REQ] /api/currency-rates', { query: req.query, body: req.body });
+  logger.info('API Request: /api/currency-rates', { query: req.query, body: req.body });
   try {
-    console.log("Backend /api/currency-rates endpoint hit");
+    logger.info("Backend /api/currency-rates endpoint hit");
     const rates = await fetchBackendCurrencyRates();
     if (rates && Object.keys(rates).length > 0) {
       res.json(rates);
     } else {
       // This case implies fallback to static rates or an empty object if initial fetch failed badly
-      console.warn("Backend /api/currency-rates returning potentially static or empty rates.");
+      logger.warn("Backend /api/currency-rates returning potentially static or empty rates.");
       res.json(rates || STATIC_CURRENCY_RATES); // Send static if rates is null/undefined
     }
   } catch (error) {
-    console.error("Error in /api/currency-rates endpoint (backend):", error);
+    logger.error("Error in /api/currency-rates endpoint (backend):", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Failed to fetch currency rates" });
   }
 });
 
 // Get global average medicine price - UPDATED to convert to USD before averaging
 app.get("/api/global-average-medicine-price", async (req, res) => {
-  console.log('[REQ] /api/global-average-medicine-price', { query: req.query, body: req.body });
+  logger.info('API Request: /api/global-average-medicine-price', { query: req.query, body: req.body });
   try {
     // First, get all the medicine prices with their country currencies
     let sql = `
@@ -235,7 +248,7 @@ app.get("/api/global-average-medicine-price", async (req, res) => {
     // Execute the query to get all prices with their currencies
     db.query(sql, params, async (err, results) => {
       if (err) {
-        console.error("Error fetching prices for global average:", err);
+        logger.error("Error fetching prices for global average:", { error: err.message, stack: err.stack });
         return res.status(500).json({ error: "Database error" });
       }
       
@@ -262,18 +275,18 @@ app.get("/api/global-average-medicine-price", async (req, res) => {
       // Format the result
       const globalAverage = formatPrice(avg) || 0;
       
-      console.log(`Calculated global average from ${validPrices.length} valid prices: $${globalAverage} USD with month filter: ${req.query.month || 'none'}`);
+      logger.info(`Calculated global average from ${validPrices.length} valid prices: $${globalAverage} USD with month filter: ${req.query.month || 'none'}`);
       res.json({ global_average: globalAverage });
     });
   } catch (error) {
-    console.error("Error calculating global average:", error);
+    logger.error("Error calculating global average:", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Server error calculating global average" });
   }
 });
 
 // Get average prices for all countries with trend data
 app.get("/api/countries-average-prices", (req, res) => {
-  console.log('[REQ] /api/countries-average-prices', { query: req.query, body: req.body });
+  logger.info('API Request: /api/countries-average-prices', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.id AS countryId,
@@ -392,7 +405,7 @@ app.get("/api/countries-average-prices", (req, res) => {
   
   db.query(sql, params, async (err, results) => {
     if (err) {
-      console.error("Error fetching countries averages:", err);
+      logger.error("Error fetching countries averages:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     
@@ -410,14 +423,14 @@ app.get("/api/countries-average-prices", (req, res) => {
       pillsPerPackage: parseFloat(country.pillsPerPackage) || 1,
     }));
     
-    console.log(`Returning countries data with month filter: ${req.query.month || 'none'}`);
+    logger.info(`Returning countries data with month filter: ${req.query.month || 'none'}`);
     res.json(formattedResults);
   });
 });
 
 // Get all countries with price trend data
 app.get("/api/countries", (req, res) => {
-  console.log('[REQ] /api/countries', { query: req.query, body: req.body });
+  logger.info('API Request: /api/countries', { query: req.query, body: req.body });
   const sql = `
     SELECT 
       c.id, 
@@ -456,7 +469,7 @@ app.get("/api/countries", (req, res) => {
   
   db.query(sql, (err, results) => {
     if (err) {
-      console.error("Error fetching countries:", err);
+      logger.error("Error fetching countries:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
@@ -465,7 +478,7 @@ app.get("/api/countries", (req, res) => {
 
 // Updated endpoint to get available months - for use with month picker
 app.get("/api/available-months", (req, res) => {
-  console.log('[REQ] /api/available-months', { query: req.query, body: req.body });
+  logger.info('API Request: /api/available-months', { query: req.query, body: req.body });
   const sql = `
     SELECT DISTINCT DATE_FORMAT(month, '%Y-%m') as available_month
     FROM medicine_countries
@@ -475,20 +488,20 @@ app.get("/api/available-months", (req, res) => {
   
   db.query(sql, (err, results) => {
     if (err) {
-      console.error("Error fetching available months:", err);
+      logger.error("Error fetching available months:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     
     // Extract months from results
     const availableMonths = results.map(row => row.available_month);
-    console.log('Returning available months:', availableMonths);
+    logger.info('Returning available months:', availableMonths);
     res.json(availableMonths);
   });
 });
 
 // Public endpoint to get all medicines (for search modal)
 app.get("/api/medicines", (req, res) => {
-  console.log('[REQ] /api/medicines', { query: req.query, body: req.body });
+  logger.info('API Request: /api/medicines', { query: req.query, body: req.body });
   const sql = `
     SELECT id, name, dosage
     FROM medicines
@@ -497,7 +510,7 @@ app.get("/api/medicines", (req, res) => {
   `;
   db.query(sql, [], (err, results) => {
     if (err) {
-      console.error("Error fetching medicines:", err);
+      logger.error("Error fetching medicines:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
@@ -512,7 +525,7 @@ app.use('/api', userRoutes);
 
 // Get country average medicine price
 app.get("/api/country/:countryId/average-medicine-price", (req, res) => {
-  console.log('[REQ] /api/country/:countryId/average-medicine-price', { query: req.query, body: req.body });
+  logger.info('API Request: /api/country/:countryId/average-medicine-price', { query: req.query, body: req.body });
   let sql = `
     SELECT AVG(avg_price) AS overall_average FROM (
       SELECT AVG(mc.sale_price) AS avg_price
@@ -547,7 +560,7 @@ app.get("/api/country/:countryId/average-medicine-price", (req, res) => {
   
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching country average:", err);
+      logger.error("Error fetching country average:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results[0]);
@@ -556,7 +569,7 @@ app.get("/api/country/:countryId/average-medicine-price", (req, res) => {
 
 // Get country details
 app.get("/api/country/:countryId/details", (req, res) => {
-  console.log('[REQ] /api/country/:countryId/details', { query: req.query, body: req.body });
+  logger.info('API Request: /api/country/:countryId/details', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.name,
@@ -592,7 +605,7 @@ app.get("/api/country/:countryId/details", (req, res) => {
   
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching country details:", err);
+      logger.error("Error fetching country details:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     const countryDetails = results[0] || null; // Get the first row or null
@@ -604,14 +617,14 @@ app.get("/api/country/:countryId/details", (req, res) => {
         countryDetails.avg_price = parseFloat(countryDetails.avg_price);
       }
     }
-    console.log(`Country details for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, countryDetails);
+    logger.info(`Country details for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, countryDetails);
     res.json(countryDetails);
   });
 });
 
 // Get country medicines
 app.get("/api/country/:countryId/medicines", (req, res) => {
-  console.log('[REQ] /api/country/:countryId/medicines', { query: req.query, body: req.body });
+  logger.info('API Request: /api/country/:countryId/medicines', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.name AS country, 
@@ -648,7 +661,7 @@ app.get("/api/country/:countryId/medicines", (req, res) => {
   
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching medicines:", err);
+      logger.error("Error fetching medicines:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
@@ -656,7 +669,7 @@ app.get("/api/country/:countryId/medicines", (req, res) => {
 });
 
 app.get("/api/country/:countryId/summary", (req, res) => {
-  console.log('[REQ] /api/country/:countryId/summary', { query: req.query, body: req.body });
+  logger.info('API Request: /api/country/:countryId/summary', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.name AS country, 
@@ -689,17 +702,17 @@ app.get("/api/country/:countryId/summary", (req, res) => {
   
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching summary:", err);
+      logger.error("Error fetching summary:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
-    console.log(`Country summary for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, results[0]);
+    logger.info(`Country summary for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`, results[0]);
     res.json(results[0] || null);
   });
 });
 
 // Get top 5 medicines for a country
 app.get("/api/country/:countryId/top-medicines", (req, res) => {
-  console.log('[REQ] /api/country/:countryId/top-medicines', { query: req.query, body: req.body });
+  logger.info('API Request: /api/country/:countryId/top-medicines', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       m.name,
@@ -741,7 +754,7 @@ app.get("/api/country/:countryId/top-medicines", (req, res) => {
   
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching top medicines:", err);
+      logger.error("Error fetching top medicines:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     
@@ -751,14 +764,14 @@ app.get("/api/country/:countryId/top-medicines", (req, res) => {
       medicine.originalPrice = formatPrice(medicine.originalPrice);
     });
     
-    console.log(`Top medicines for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`);
+    logger.info(`Top medicines for ${req.params.countryId} with month filter: ${req.query.month || 'none'}`);
     res.json(results);
   });
 });
 
 // Get medicine details (with date/month/range filtering)
 app.get("/api/medicines/:medicineId", (req, res) => {
-  console.log('[REQ] /api/medicines/:medicineId', { query: req.query, body: req.body });
+  logger.info('API Request: /api/medicines/:medicineId', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       m.id, m.name, m.dosage,
@@ -792,7 +805,7 @@ app.get("/api/medicines/:medicineId", (req, res) => {
 
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching medicine details:", err);
+      logger.error("Error fetching medicine details:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results[0] || null);
@@ -801,7 +814,7 @@ app.get("/api/medicines/:medicineId", (req, res) => {
 
 // Get countries where this medicine is available (with date/month/range filtering)
 app.get("/api/medicines/:medicineId/countries", (req, res) => {
-  console.log('[REQ] /api/medicines/:medicineId/countries', { query: req.query, body: req.body });
+  logger.info('API Request: /api/medicines/:medicineId/countries', { query: req.query, body: req.body });
   let sql = `
     SELECT 
       c.id, c.name, c.currency,
@@ -832,7 +845,7 @@ app.get("/api/medicines/:medicineId/countries", (req, res) => {
 
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("Error fetching medicine countries:", err);
+      logger.error("Error fetching medicine countries:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     // Ensure avg_price is always a number or null
@@ -846,7 +859,7 @@ app.get("/api/medicines/:medicineId/countries", (req, res) => {
 
 // Get available months for a specific medicine
 app.get("/api/medicines/:medicineId/available-months", (req, res) => {
-  console.log('[REQ] /api/medicines/:medicineId/available-months', { query: req.query, body: req.body });
+  logger.info('API Request: /api/medicines/:medicineId/available-months', { query: req.query, body: req.body });
   const sql = `
     SELECT DISTINCT DATE_FORMAT(month, '%Y-%m') as available_month
     FROM medicine_countries
@@ -855,7 +868,7 @@ app.get("/api/medicines/:medicineId/available-months", (req, res) => {
   `;
   db.query(sql, [req.params.medicineId], (err, results) => {
     if (err) {
-      console.error("Error fetching available months for medicine:", err);
+      logger.error("Error fetching available months for medicine:", { error: err.message, stack: err.stack });
       return res.status(500).json({ error: "Database error" });
     }
     const months = results.map(row => row.available_month);
@@ -863,15 +876,26 @@ app.get("/api/medicines/:medicineId/available-months", (req, res) => {
   });
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error:', { 
+    error: err.message, 
+    stack: err.stack,
+    path: req.path,
+    method: req.method
+  });
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 // Start server
 server.listen(port, () => {
-  console.log(`Server with WebSockets running on port ${port}`);
+  logger.info(`Server with WebSockets running on port ${port}`);
 });
 
 module.exports = {
   startServer: () => {
     server.listen(port, () => {
-      console.log(`Server with WebSockets running on port ${port}`);
+      logger.info(`Server with WebSockets running on port ${port}`);
     });
     return server;
   }

@@ -7,7 +7,7 @@ type VisualizationType = "markers" | "graphs"; // "markers" shows tooltips, "gra
 
 interface DateRange {
   from: Date;
-  to?: Date;
+  to: Date | null;
 }
 
 interface MapContextProps {
@@ -105,7 +105,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
         if (months && months.length > 0) {
           setAvailableMonths(months);
           
-          // If the current selected month is not available, reset to most recent month
+          // Only reset to most recent month if we're not in 'all' mode
           if (selectedMonth && selectedMonth !== 'all' && !months.includes(selectedMonth)) {
             setSelectedMonth(months[0]);
           }
@@ -124,7 +124,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
     };
 
     fetchAvailableMonths();
-  }, []);
+  }, []); // Only run on mount
 
   // Create a memoized context value to prevent unnecessary re-renders
   const contextValue = useMemo(() => ({

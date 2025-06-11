@@ -81,7 +81,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
                 variant="outline"
                 size="lg"
                 className={cn(
-                  "relative flex flex-col items-center justify-center p-8 gap-4 h-auto transition-all duration-300",
+                  "relative flex flex-col items-center justify-center py-8 px-4 gap-4 h-auto transition-all duration-300",
                   "hover:scale-[1.02] hover:shadow-lg group overflow-hidden",
                   "border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/5",
                   "before:absolute before:inset-0 before:bg-gradient-to-br before:from-blue-500/10 before:to-transparent before:opacity-0 before:transition-opacity before:duration-300 hover:before:opacity-100",
@@ -95,7 +95,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
                   </div>
                   <div className="flex flex-col items-center text-center w-full">
                     <span className="font-semibold text-lg mb-1">Countries</span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground text-center text-wrap whitespace-normal break-words">
                       Discover medicine prices by geographic location
                     </span>
                   </div>
@@ -107,7 +107,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
                 variant="outline"
                 size="lg"
                 className={cn(
-                  "relative flex flex-col items-center justify-center p-8 gap-4 h-auto transition-all duration-300",
+                  "relative flex flex-col items-center justify-center py-8 px-4 gap-4 h-auto transition-all duration-300",
                   "hover:scale-[1.02] hover:shadow-lg group overflow-hidden",
                   "border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/5",
                   "before:absolute before:inset-0 before:bg-gradient-to-br before:from-green-500/10 before:to-transparent before:opacity-0 before:transition-opacity before:duration-300 hover:before:opacity-100",
@@ -121,7 +121,7 @@ export const SearchSelectionModal: React.FC<SearchSelectionModalProps> = ({
                   </div>
                   <div className="flex flex-col items-center text-center w-full">
                     <span className="font-semibold text-lg mb-1">Medicines</span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground text-center text-wrap whitespace-normal break-words">
                       Compare pharmaceutical prices worldwide
                     </span>
                   </div>

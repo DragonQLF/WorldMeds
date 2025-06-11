@@ -1,8 +1,8 @@
-
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const url = require('url');
 const { JWT_SECRET } = require('./middleware/auth');
+const logger = require('./utils/logger');
 
 // Keep track of all connected clients
 const clients = new Map();
@@ -61,7 +61,11 @@ function setupWebsocketServer(server) {
     const userId = ws.userId;
     const ip = request.headers['x-forwarded-for'] || request.socket.remoteAddress;
     
-    console.log(`WebSocket connection established: ${ws.isAuthenticated ? 'User: ' + userId : 'Anonymous visitor'}, IP: ${ip}`);
+    logger.info('WebSocket connection established', { 
+        userId: ws.isAuthenticated ? userId : 'anonymous',
+        ip,
+        isAuthenticated: ws.isAuthenticated 
+    });
     
     // Store client connection
     clients.set(ws, { 
@@ -91,16 +95,25 @@ function setupWebsocketServer(server) {
           return;
         }
         
-        console.log(`Received message from ${ws.isAuthenticated ? userId : 'anonymous'}:`, parsedMessage);
+        logger.debug('Received WebSocket message', { 
+            userId: ws.isAuthenticated ? userId : 'anonymous',
+            message: parsedMessage 
+        });
       } catch (error) {
-        console.error('Error processing WebSocket message:', error);
+        logger.error('Error processing WebSocket message:', { 
+            error: error.message,
+            stack: error.stack 
+        });
       }
     });
     
     // Handle client disconnection
     ws.on('close', () => {
       const clientData = clients.get(ws);
-      console.log(`WebSocket connection closed: ${clientData?.isAuthenticated ? 'User: ' + clientData.userId : 'Anonymous visitor'}`);
+      logger.info('WebSocket connection closed', { 
+          userId: clientData?.isAuthenticated ? clientData.userId : 'anonymous',
+          ip: clientData?.ip 
+      });
       
       // Remove client from map
       clients.delete(ws);
@@ -130,7 +143,11 @@ function setupWebsocketServer(server) {
     
     // Handle connection errors
     ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
+      logger.error('WebSocket error:', { 
+          error: error.message,
+          stack: error.stack,
+          userId: ws.isAuthenticated ? userId : 'anonymous'
+      });
       clients.delete(ws);
       
       // If anonymous, decrement visitor count
@@ -144,7 +161,7 @@ function setupWebsocketServer(server) {
   const interval = setInterval(() => {
     wss.clients.forEach((ws) => {
       if (ws.isAlive === false) {
-        console.log("Terminating stale connection");
+        logger.info('Terminating stale connection');
         if (!ws.isAuthenticated) {
           anonymousVisitors = Math.max(0, anonymousVisitors - 1);
         }
@@ -157,7 +174,7 @@ function setupWebsocketServer(server) {
   
   // Stop the interval when the server closes
   wss.on('close', () => {
-    console.log("WebSocket server closing, clearing interval");
+    logger.info('WebSocket server closing, clearing interval');
     clearInterval(interval);
   });
   

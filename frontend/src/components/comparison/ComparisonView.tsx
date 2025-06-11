@@ -10,7 +10,8 @@ import {
   Crown,
   X,
   Plus,
-  Filter
+  Filter,
+  Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -31,11 +33,12 @@ import {
   Tooltip,
   Legend,
   LineChart,
-  Line
+  Line,
+  Cell
 } from "recharts";
 import { useMapContext } from "@/contexts/MapContext";
 
-const MAX_MEDICINES = 5;
+const MAX_MEDICINES = 1;
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 interface ComparisonViewProps {
@@ -50,6 +53,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"table" | "chart">("chart");
   const [sortBy, setSortBy] = useState<"name" | "price">("price");
+  const [medicineSearch, setMedicineSearch] = useState("");
 
   // Fetch medicines list from the API
   const { data: medicines, isLoading: loadingMedicines } = useQuery({
@@ -90,54 +94,42 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
     enabled: selectedMedicines.length > 0
   });
 
-  // Fetch available medicines based on selected countries (for validation)
-  const { data: availableMedicines } = useQuery({
-    queryKey: ['medicines', selectedCountries],
-    queryFn: async () => {
-      if (!selectedCountries.length) {
-        return medicines || [];
-      }
-      
-      const countryIds = selectedCountries.join(',');
-
-      // Add date/month filtering to the query
-      let dateParams = '';
-      if (useTimeFiltering) {
-        if (selectedDate) {
-          dateParams = `&date=${selectedDate.toISOString().split('T')[0]}`;
-        } else if (dateRange && dateRange.from) {
-          const from = dateRange.from.toISOString().split('T')[0];
-          const to = dateRange.to ? dateRange.to.toISOString().split('T')[0] : '';
-          dateParams = `&start=${from}${to ? `&end=${to}` : ''}`;
-        } else if (selectedMonth && selectedMonth !== 'all') {
-          dateParams = `&month=${selectedMonth}`;
-        }
-      }
-      
-      const response = await api.get(`/comparison/medicines?countries=${countryIds}${dateParams}`);
-      return response.data;
-    },
-    enabled: selectedCountries.length > 0
-  });
-
   // Initialize comparison data query
   const { data: comparisonData, isLoading: loadingComparison } = useQuery({
-    queryKey: ['comparison-data', selectedMedicines, selectedCountries],
+    queryKey: ['comparison-data', selectedMedicines, selectedCountries, selectedDate, dateRange, selectedMonth, useTimeFiltering], // Added date/time filter dependencies
     queryFn: async () => {
       if (!selectedMedicines.length || !selectedCountries.length) {
         return [];
       }
-      
+
       // Build query params
       const medicineIds = selectedMedicines.join(',');
       const countryIds = selectedCountries.join(',');
-      const url = `/comparison/data?medicineIds=${medicineIds}&countries=${countryIds}&mode=medicine`;
-      
+
+      // Add date/month filtering to the query parameters
+      let dateParam = '';
+      if (useTimeFiltering) {
+        if (selectedDate) {
+          const formattedDate = selectedDate.toISOString().split('T')[0];
+          dateParam = `&date=${formattedDate}`;
+        } else if (selectedMonth && selectedMonth !== 'all') {
+          dateParam = `&month=${selectedMonth}`;
+        }
+         // Note: Backend /compare endpoint currently only supports 'month' or 'date', not 'start/end' range directly.
+         // If a date range is selected, only 'month' or 'date' will be sent if available.
+         // Full range filtering might require backend modification or frontend filtering.
+      }
+
+
+      // Use the correct backend endpoint and parameter names
+      const url = `/comparison/compare?medicines=${medicineIds}&countries=${countryIds}${dateParam}`; // <-- THIS IS THE CORRECTED LINE
+
       const response = await api.get(url);
       return response.data;
     },
     enabled: selectedMedicines.length > 0 && selectedCountries.length > 0
   });
+
 
   // Formatting and preparing data for display
   const prepareDisplayData = async () => {
@@ -155,13 +147,32 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
             item.displayPrice = usdPrice;
             item.displayCurrency = 'USD';
           } catch (error) {
-            console.error("Error converting to USD:", error);
+            console.error("Error converting current price to USD:", error);
             item.displayPrice = item.price;
             item.displayCurrency = item.currency || 'USD';
           }
         } else {
           item.displayPrice = item.price;
           item.displayCurrency = item.currency || 'USD';
+        }
+        
+        // Convert historical trend data to USD as well
+        if (item.trendData && item.trendData.length > 0) {
+          item.displayTrendData = await Promise.all(item.trendData.map(async (trendItem: any) => {
+            if (trendItem.currency && trendItem.currency.toUpperCase() !== 'USD') {
+              try {
+                const usdTrendPrice = await convertToUSD(trendItem.price, trendItem.currency);
+                return { ...trendItem, price: usdTrendPrice, currency: 'USD' };
+              } catch (error) {
+                console.error("Error converting trend price to USD:", error);
+                return trendItem; // Return original if conversion fails
+              }
+            } else {
+              return trendItem;
+            }
+          }));
+        } else {
+          item.displayTrendData = [];
         }
       }
     }
@@ -193,25 +204,6 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
     }
   }, [comparisonData, selectedCountries, sortBy]);
 
-  // Clean up selected medicines when countries change to prevent invalid selections
-  useEffect(() => {
-    if (selectedCountries.length > 0 && availableMedicines) {
-      const validMedicineIds = availableMedicines.map(m => m.id);
-      const filteredMedicines = selectedMedicines.filter(id => validMedicineIds.includes(id));
-      
-      if (filteredMedicines.length !== selectedMedicines.length) {
-        setSelectedMedicines(filteredMedicines);
-        const removedCount = selectedMedicines.length - filteredMedicines.length;
-        if (removedCount > 0) {
-          toast({
-            title: "Medicines filtered",
-            description: `${removedCount} medicine(s) removed as they're not available in the selected countries.`
-          });
-        }
-      }
-    }
-  }, [selectedCountries, availableMedicines, selectedMedicines, toast]);
-  
   // Find cheapest and most expensive items
   const findExtremes = () => {
     if (!processedData || processedData.length <= 1) {
@@ -242,29 +234,27 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
 
   // Handle medicine selection (with validation)
   const handleMedicineToggle = (medicineId: string) => {
-    if (selectedMedicines.includes(medicineId)) {
-      setSelectedMedicines(selectedMedicines.filter(id => id !== medicineId));
-    } else if (selectedMedicines.length < MAX_MEDICINES) {
-      // Check if this medicine is available in selected countries
-      if (selectedCountries.length > 0 && availableMedicines) {
-        const isAvailable = availableMedicines.some(m => m.id === medicineId);
-        if (!isAvailable) {
-          toast({
-            variant: "destructive",
-            title: "Medicine not available",
-            description: "This medicine is not available in the selected countries."
-          });
-          return;
+    setSelectedMedicines(prevSelected => {
+      const isSelected = prevSelected.includes(medicineId);
+      
+      if (isSelected) {
+        // Deselect medicine
+        const newSelectedMedicines = prevSelected.filter(id => id !== medicineId);
+        // If no medicines are selected, clear selected countries as well
+        if (newSelectedMedicines.length === 0) {
+          setSelectedCountries([]);
+        }
+        return newSelectedMedicines;
+      } else {
+        // Select medicine (respect MAX_MEDICINES)
+        if (prevSelected.length < MAX_MEDICINES) {
+          return [...prevSelected, medicineId];
+        } else {
+          // If max is reached, replace the currently selected medicine
+          return [medicineId];
         }
       }
-      setSelectedMedicines([...selectedMedicines, medicineId]);
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Selection limit reached",
-        description: `You can only compare up to ${MAX_MEDICINES} medicines at once`
-      });
-    }
+    });
   };
 
   // Handle country selection
@@ -278,7 +268,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
 
   // Enhanced item management functions
   const handleRemoveMedicine = (medicineId: string) => {
-    setSelectedMedicines(selectedMedicines.filter(id => id !== medicineId));
+    setSelectedMedicines([]); // Clear selection
+    // If no medicines are selected (which should be the case here), clear selected countries
+    setSelectedCountries([]);
   };
 
   const handleRemoveCountry = (countryId: string) => {
@@ -302,14 +294,46 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
   const getFormattedTrendData = () => {
     if (!processedData || processedData.length === 0) return [];
     
-    // Return array with each country and their trend data
-    return processedData.map(item => ({
-      name: item.country || 'Unknown',
-      data: Array.isArray(item.trendData) ? item.trendData.map(trend => ({
-        ...trend,
-        currency: trend.currency || item.displayCurrency || 'USD'
-      })) : []
-    }));
+    // Group trend data by country and then medicine
+    const trendDataGrouped = processedData.reduce((acc, item) => {
+      // Use displayTrendData which contains converted prices
+      if (!item.displayTrendData || item.displayTrendData.length === 0) return acc; // Skip if no trend data
+
+      if (!acc[item.country]) {
+        acc[item.country] = {};
+      }
+      
+      if (!acc[item.country][item.medicine_id]) {
+         acc[item.country][item.medicine_id] = {
+            countryName: item.country,
+            medicineName: item.medicine,
+            data: []
+         };
+      }
+
+      // Add historical price points from displayTrendData
+      item.displayTrendData.forEach(trendItem => {
+         acc[item.country][item.medicine_id].data.push({
+            month: trendItem.month,
+            price: trendItem.price, // Use converted price
+            currency: trendItem.currency // Use converted currency (should be USD)
+         });
+      });
+      
+      return acc;
+    }, {});
+
+    // Convert to a flat array of series for the chart, sorting data points by month
+    const chartSeries = Object.values(trendDataGrouped).flatMap(countryData => 
+        Object.values(countryData).map(medicineSeries => ({
+            ...medicineSeries,
+            name: medicineSeries.countryName, // Only show country name in legend
+            data: medicineSeries.data.sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime())
+        }))
+    );
+
+    // Filter out series with less than 2 data points (no trend possible)
+    return chartSeries.filter(series => series.data.length >= 2);
   };
   
   // Combined loading state
@@ -317,29 +341,55 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
 
   // Enhanced custom tooltip for charts with safety checks
   const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length && label) {
-      const data = payload[0];
-      const isCheapest = cheapest && label === cheapest.country;
+    if (active && payload && payload.length) {
+      // The label for the trend chart is the date string
+      const dateString = label;
       
+      // Format the date string into a more readable format (e.g., "Month Year")
+      let formattedDate = dateString;
+      try {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) { // Check if date is valid
+          const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long' };
+          formattedDate = date.toLocaleDateString('en-US', options); // Specify en-US locale
+          
+          // Capitalize the first letter of the formatted date
+          if (formattedDate.length > 0) {
+            formattedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+          }
+        }
+      } catch (error) {
+        console.error("Error formatting date for tooltip:", error);
+        // Fallback to original string if formatting fails
+      }
+
       return (
         <div className="bg-background border border-border rounded-lg shadow-lg p-3 animate-fade-in">
-          <p className="font-medium text-foreground">{label}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: data.color || '#3b82f6' }}
-            />
-            <span className="text-sm">
-              {data.payload && data.payload.currency 
-                ? formatCurrencyWithSymbol(data.value || 0, data.payload.currency)
-                : `$${(data.value || 0).toFixed(2)}`}
-            </span>
-            {isCheapest && (
-              <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                <Crown className="w-3 h-3 mr-1" />
-                Cheapest
-              </Badge>
-            )}
+          <p className="font-medium text-foreground">{formattedDate}</p>
+          <div className="space-y-1 mt-1">
+            {payload.map((data: any, index: number) => {
+              const value = data.value;
+              const currency = data.payload?.currency || 'USD';
+              const formattedValue = typeof value === 'number' 
+                ? formatCurrencyWithSymbol(value, currency)
+                : 'N/A';
+              
+              // For trend chart, use the series name directly as it's now just the country name
+              const displayLabel = data.name || 'Unknown Country';
+              
+              const isCheapest = cheapest && cheapest.country === displayLabel;
+
+              return (
+                <div key={index} className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: data.color || data.stroke || COLORS[index % COLORS.length] }}
+                  />
+                  <span className="text-sm font-medium text-foreground">{displayLabel}:</span>
+                  <span className="text-sm text-muted-foreground">{formattedValue}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
@@ -349,26 +399,35 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
 
   // Get the list of medicines to show based on country selection
   const getMedicinesToShow = () => {
-    if (selectedCountries.length > 0 && availableMedicines) {
-      return availableMedicines;
-    }
     return medicines || [];
   };
 
+  // Get filtered medicines based on search
+  const getFilteredMedicines = () => {
+    if (!medicines) return [];
+    if (!medicineSearch.trim()) return medicines;
+    
+    const searchLower = medicineSearch.toLowerCase();
+    return medicines.filter(medicine => 
+      medicine.name.toLowerCase().includes(searchLower) ||
+      medicine.dosage.toLowerCase().includes(searchLower)
+    );
+  };
+
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full max-w-screen-xl mx-auto p-4 md:p-6 space-y-8">
       {/* Enhanced Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             Medicine Price Comparison
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-lg text-muted-foreground">
             Compare prices across countries and find the best deals
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Filter className="w-4 h-4" />
             Sort by:
@@ -387,27 +446,27 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
 
       {/* Enhanced Selection Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-2 border-dashed border-border hover:border-primary/50 transition-colors">
+        <Card className="border border-border shadow-sm">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <BarChart2 className="w-4 h-4 text-blue-600 dark:text-blue-300" />
-                  </div>
-                  Select Medicines
-                </CardTitle>
-                <CardDescription>
-                  Choose up to {MAX_MEDICINES} medicines to compare
-                  {selectedCountries.length > 0 && " (filtered by selected countries)"}
-                </CardDescription>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100/50 dark:bg-blue-900/50 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <BarChart2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-semibold">Select Medicine</CardTitle>
+                  <CardDescription>
+                    Choose one medicine to compare
+                    {selectedCountries.length > 0 && " (filtered by selected countries)"}
+                  </CardDescription>
+                </div>
               </div>
-              <Badge variant="outline" className="text-sm">
-                {selectedMedicines.length}/{MAX_MEDICINES}
+              <Badge variant="outline" className="text-sm font-medium px-3 py-1">
+                {selectedMedicines.length}/1
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-0">
             {/* Selected medicines with remove buttons */}
             {selectedMedicines.length > 0 && (
               <div className="space-y-2">
@@ -416,12 +475,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
                   {selectedMedicines.map(medicineId => {
                     const medicine = getMedicinesToShow().find(m => m.id === medicineId);
                     return (
-                      <Badge key={medicineId} variant="secondary" className="gap-2">
+                      <Badge key={medicineId} variant="secondary" className="gap-1 pr-1">
                         {medicine?.name}
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                          size="sm" 
+                          className="h-4 w-4 p-0 rounded-sm hover:bg-destructive hover:text-destructive-foreground"
                           onClick={() => handleRemoveMedicine(medicineId)}
                         >
                           <X className="w-3 h-3" />
@@ -433,47 +492,60 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
               </div>
             )}
             
-            <ScrollArea className="h-48">
+            {/* Add search input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search medicines..."
+                value={medicineSearch}
+                onChange={(e) => setMedicineSearch(e.target.value)}
+                className="pl-9 pr-3 py-2"
+              />
+            </div>
+            
+            {/* Scrollable list of medicines */}
+            <ScrollArea className="flex-1 overflow-y-auto min-h-0">
               {loadingMedicines ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
                 </div>
               ) : (
                 <div className="grid gap-2 pr-4">
-                  {getMedicinesToShow().map(medicine => {
+                  {getFilteredMedicines().map(medicine => {
                     const isSelected = selectedMedicines.includes(medicine.id);
                     const isDisabled = !isSelected && selectedMedicines.length >= MAX_MEDICINES;
                     
                     return (
                       <Button
                         key={medicine.id}
-                        variant={isSelected ? "default" : "outline"}
+                        variant="ghost"
                         onClick={() => handleMedicineToggle(medicine.id)}
                         className={cn(
-                          "justify-start text-left h-auto p-3 transition-all",
+                          "justify-start text-left h-auto p-3 transition-colors",
+                          "hover:bg-muted", // Use muted background on hover
                           isSelected 
-                            ? "ring-2 ring-primary/20" 
-                            : "hover:border-primary/50",
-                          isDisabled && "opacity-50"
+                            ? "bg-primary/10 text-primary-foreground hover:bg-primary/20" // Style for selected item
+                            : "",
+                          isDisabled && "opacity-50 cursor-not-allowed"
                         )}
                         disabled={isDisabled}
                       >
                         <div className="flex items-center gap-3 w-full">
                           <div className={cn(
-                            "w-2 h-2 rounded-full",
+                            "w-2.5 h-2.5 rounded-full",
                             isSelected 
-                              ? "bg-primary-foreground" 
-                              : "bg-muted-foreground"
+                              ? "bg-primary" // Primary color for selected dot
+                              : "bg-muted-foreground" // Muted for unselected dot
                           )} />
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{medicine.name}</div>
+                            <div className={cn("font-medium truncate", isSelected && "text-primary")}>{medicine.name}</div>
                             <div className="text-xs text-muted-foreground truncate">
-                              {medicine.active_ingredient}
+                              {medicine.dosage}
                             </div>
                           </div>
                           {isSelected && (
-                            <div className="text-primary">
-                              <Plus className="w-4 h-4 rotate-45" />
+                            <div className="text-primary shrink-0">
+                              <Badge variant="secondary" className="bg-primary/20 text-primary px-2 py-0.5 font-normal">Selected</Badge>
                             </div>
                           )}
                         </div>
@@ -486,31 +558,38 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-dashed border-border hover:border-primary/50 transition-colors">
+        <Card className="border border-border shadow-sm">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <CircleDollarSign className="w-4 h-4 text-green-600 dark:text-green-300" />
-                  </div>
-                  Select Countries
-                </CardTitle>
-                <CardDescription>
-                  Choose countries to compare prices
-                </CardDescription>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100/50 dark:bg-green-900/50 rounded-lg border border-green-200 dark:border-green-800">
+                  <CircleDollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-semibold">Select Countries</CardTitle>
+                  <CardDescription>
+                    Choose countries to compare prices
+                  </CardDescription>
+                </div>
               </div>
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => availableCountries?.length > 0 && setSelectedCountries(availableCountries.map(c => c.id))}
+                className="text-sm px-3 py-1 h-auto"
+                onClick={() => {
+                  if (selectedCountries.length === availableCountries?.length && selectedCountries.length > 0) {
+                    setSelectedCountries([]);
+                  } else {
+                    availableCountries?.length > 0 && setSelectedCountries(availableCountries.map(c => c.id));
+                  }
+                }}
                 disabled={loadingAvailableCountries || !availableCountries?.length}
               >
-                Select All
+                {selectedCountries.length === availableCountries?.length && selectedCountries.length > 0 ? "Unselect All" : "Select All"}
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-0 flex flex-col">
             {/* Selected countries with remove buttons */}
             {selectedCountries.length > 0 && (
               <div className="space-y-2">
@@ -519,12 +598,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
                   {selectedCountries.map(countryId => {
                     const country = availableCountries?.find(c => c.id === countryId);
                     return (
-                      <Badge key={countryId} variant="secondary" className="gap-2">
+                      <Badge key={countryId} variant="secondary" className="gap-1 pr-1">
                         {country?.name} ({country?.currency})
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                          className="h-4 w-4 p-0 rounded-sm hover:bg-destructive hover:text-destructive-foreground"
                           onClick={() => handleRemoveCountry(countryId)}
                         >
                           <X className="w-3 h-3" />
@@ -536,7 +615,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
               </div>
             )}
 
-            <ScrollArea className="h-48">
+            <ScrollArea className="flex-1 overflow-y-auto min-h-0">
               {(loadingAvailableCountries || (!availableCountries && selectedMedicines.length > 0)) ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
@@ -548,32 +627,33 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
                       {availableCountries.map(country => (
                         <Button
                           key={country.id}
-                          variant={selectedCountries.includes(country.id) ? "default" : "outline"}
+                          variant="ghost"
                           onClick={() => handleCountryToggle(country.id)}
                           className={cn(
-                            "justify-start h-auto p-3 transition-all",
+                            "justify-start text-left h-auto p-3 transition-colors",
+                            "hover:bg-muted", // Use muted background on hover
                             selectedCountries.includes(country.id) 
-                              ? "ring-2 ring-primary/20" 
-                              : "hover:border-primary/50"
+                              ? "bg-green-100/50 dark:bg-green-900/50 text-green-800 dark:text-green-200 hover:bg-green-100/70 dark:hover:bg-green-900/70" // Style for selected item
+                              : ""
                           )}
                         >
                           <div className="flex items-center gap-3 w-full">
                             <div className={cn(
-                              "w-2 h-2 rounded-full",
+                              "w-2.5 h-2.5 rounded-full",
                               selectedCountries.includes(country.id) 
-                                ? "bg-primary-foreground" 
-                                : "bg-muted-foreground"
+                                ? "bg-green-600 dark:bg-green-400" // Green color for selected dot
+                                : "bg-muted-foreground" // Muted for unselected dot
                             )} />
                             <div className="flex-1 text-left">
-                              <div className="font-medium">{country.name}</div>
+                              <div className={cn("font-medium", selectedCountries.includes(country.id) && "text-foreground")}>{country.name}</div>
                               <div className="text-xs text-muted-foreground">
                                 Currency: {country.currency}
                               </div>
                             </div>
                             {selectedCountries.includes(country.id) && (
-                              <div className="text-primary">
-                                <Plus className="w-4 h-4 rotate-45" />
-                              </div>
+                               <div className="text-green-600 dark:text-green-400 shrink-0">
+                                <Badge variant="secondary" className="bg-green-100/20 text-green-800 dark:text-green-200 px-2 py-0.5 font-normal">Selected</Badge>
+                               </div>
                             )}
                           </div>
                         </Button>
@@ -604,83 +684,81 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
       ) : processedData.length > 0 ? (
         <div className="space-y-6">
           {/* Enhanced Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-600 dark:text-blue-300">
-                      Countries
-                    </p>
-                    <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
-                      {selectedCountries.length}
-                    </p>
-                  </div>
-                  <BarChart2 className="h-8 w-8 text-blue-600 dark:text-blue-300" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border border-blue-200 dark:border-blue-800 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    Countries
+                  </p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                    {selectedCountries.length}
+                  </p>
+                </div>
+                <div className="p-2 bg-blue-200/50 dark:bg-blue-800/50 rounded-lg">
+                  <BarChart2 className="h-6 w-6 text-blue-700 dark:text-blue-300" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-600 dark:text-green-300">
-                      Cheapest Option
-                    </p>
-                    <p className="text-lg font-bold text-green-900 dark:text-green-100 truncate">
-                      {cheapest ? cheapest.country : "N/A"}
-                    </p>
-                    <p className="text-sm text-green-700 dark:text-green-200">
-                      {cheapest 
-                        ? formatCurrencyWithSymbol(cheapest.displayPrice, cheapest.displayCurrency) 
-                        : "No data"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Crown className="h-6 w-6 text-green-600 dark:text-green-300" />
-                    <TrendingDown className="h-4 w-4 text-green-600 dark:text-green-300" />
-                  </div>
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border border-green-200 dark:border-green-800 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                    Cheapest Option
+                  </p>
+                  <p className="text-lg font-bold text-green-900 dark:text-green-100 truncate">
+                    {cheapest ? cheapest.country : "N/A"}
+                  </p>
+                  <p className="text-xs text-green-800 dark:text-green-200">
+                    {cheapest 
+                      ? formatCurrencyWithSymbol(cheapest.displayPrice, cheapest.displayCurrency) 
+                      : "No data"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 p-2 bg-green-200/50 dark:bg-green-800/50 rounded-lg">
+                  <Crown className="h-5 w-5 text-green-700 dark:text-green-300" />
+                  <TrendingDown className="h-4 w-4 text-green-700 dark:text-green-300" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200 dark:border-red-800">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-red-600 dark:text-red-300">
-                      Most Expensive
-                    </p>
-                    <p className="text-lg font-bold text-red-900 dark:text-red-100 truncate">
-                      {mostExpensive ? mostExpensive.country : "N/A"}
-                    </p>
-                    <p className="text-sm text-red-700 dark:text-red-200">
-                      {mostExpensive 
-                        ? formatCurrencyWithSymbol(mostExpensive.displayPrice, mostExpensive.displayCurrency) 
-                        : "No data"}
-                    </p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-red-600 dark:text-red-300" />
+            <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border border-red-200 dark:border-red-800 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                    Most Expensive
+                  </p>
+                  <p className="text-lg font-bold text-red-900 dark:text-red-100 truncate">
+                    {mostExpensive ? mostExpensive.country : "N/A"}
+                  </p>
+                  <p className="text-xs text-red-800 dark:text-red-200">
+                    {mostExpensive 
+                      ? formatCurrencyWithSymbol(mostExpensive.displayPrice, mostExpensive.displayCurrency) 
+                      : "No data"}
+                  </p>
+                </div>
+                <div className="p-2 bg-red-200/50 dark:bg-red-800/50 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-red-700 dark:text-red-300" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-600 dark:text-purple-300">
-                      Potential Savings
-                    </p>
-                    <p className="text-3xl font-bold text-purple-900 dark:text-purple-100">
-                      {calculateSavings()}%
-                    </p>
-                    <p className="text-sm text-purple-700 dark:text-purple-200">
-                      vs highest price
-                    </p>
-                  </div>
-                  <CircleDollarSign className="h-8 w-8 text-purple-600 dark:text-purple-300" />
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border border-purple-200 dark:border-purple-800 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                    Potential Savings
+                  </p>
+                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                    {calculateSavings()}%
+                  </p>
+                  <p className="text-xs text-purple-800 dark:text-purple-200">
+                    vs highest price
+                  </p>
+                </div>
+                <div className="p-2 bg-purple-200/50 dark:bg-purple-800/50 rounded-lg">
+                  <CircleDollarSign className="h-6 w-6 text-purple-700 dark:text-purple-300" />
                 </div>
               </CardContent>
             </Card>
@@ -692,7 +770,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="text-xl">
-                    {selectedMedicines.length} Medicine{selectedMedicines.length > 1 ? "s" : ""} Across Countries
+                    {selectedMedicines.length === 1 ? "Medicine" : "No Medicine"} Across Countries
                   </CardTitle>
                   <CardDescription>
                     Sorted by {sortBy === "price" ? "price (lowest first)" : "name (A-Z)"}
@@ -732,14 +810,13 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart 
                           data={getFormattedChartData()} 
-                          margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 90 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                           <XAxis 
                             dataKey="name" 
                             angle={-45} 
                             textAnchor="end" 
-                            height={80}
                             interval={0}
                             tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
                           />
@@ -767,7 +844,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
                               const isMostExpensive = mostExpensive && entry.name === mostExpensive.country;
                               
                               return (
-                                <Bar
+                                <Cell
                                   key={`cell-${index}`}
                                   fill={
                                     isCheapest ? "#10b981" : 
@@ -865,22 +942,22 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
                 <TabsContent value="trend" className="space-y-0">
                   <div className="h-[500px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                      <LineChart margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis 
                           dataKey="month" 
                           type="category" 
                           allowDuplicatedCategory={false}
-                          tick={{ fill: "hsl(var(--foreground))" }}
+                          tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
                         />
                         <YAxis 
                           label={{ 
-                            value: 'Price', 
+                            value: `Price (${getFormattedChartData()[0]?.currency || 'USD'})`, 
                             angle: -90, 
                             position: 'insideLeft',
                             style: { textAnchor: 'middle', fill: "hsl(var(--foreground))" }
                           }}
-                          tick={{ fill: "hsl(var(--foreground))" }}
+                          tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
                         />
                         <Tooltip 
                           content={<CustomTooltip />}
@@ -893,7 +970,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
                             data={series.data} 
                             type="monotone" 
                             dataKey="price" 
-                            name={series.name} 
+                            name={series.name}
                             stroke={COLORS[index % COLORS.length]}
                             strokeWidth={3}
                             dot={{ r: 6, strokeWidth: 2, fill: "hsl(var(--background))" }}
@@ -929,3 +1006,5 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
     </div>
   );
 };
+
+
