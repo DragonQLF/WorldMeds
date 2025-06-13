@@ -13,12 +13,6 @@ const FlagContext = createContext<FlagContextType>({
   isLoading: true,
 });
 
-// List of commonly used country codes
-const COMMON_COUNTRY_CODES = [
-  'US', 'GB', 'CA', 'AU', 'FR', 'DE', 'IT', 'ES', 'JP', 'CN',
-  'BR', 'RU', 'IN', 'MX', 'AR', 'CL', 'ZA', 'KR', 'SA', 'AE'
-];
-
 export const useFlagContext = () => useContext(FlagContext);
 
 interface FlagProviderProps {
@@ -38,27 +32,8 @@ export const FlagProvider: React.FC<FlagProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    const preloadFlags = async () => {
-      try {
-        const preloadPromises = COMMON_COUNTRY_CODES.map(code => {
-          return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-              addLoadedFlag(code);
-              resolve(true);
-            };
-            img.onerror = () => resolve(false);
-            img.src = `https://flagcdn.com/${code.toLowerCase()}.svg`;
-          });
-        });
-
-        await Promise.all(preloadPromises);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    preloadFlags();
+    // No need to preload flags anymore since we'll load them as needed
+    setIsLoading(false);
   }, []);
 
   return (

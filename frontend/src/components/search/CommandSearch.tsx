@@ -15,7 +15,8 @@ import { searchCountries, searchMedicines, getAllCountries, getAllMedicines, con
 import { Pill, TrendingUp, TrendingDown, ArrowLeft, Building, DollarSign } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import FlagIcon from "@/components/flags/FlagIcon";
+import ReactCountryFlag from 'react-country-flag';
+import { DEFAULT_COUNTRY_CODE } from "@/lib/constants";
 
 interface SearchResult {
   id: number;
@@ -138,15 +139,18 @@ export const CommandSearch: React.FC<CommandSearchProps> = ({
   const displayItems = searchTerm.length >= 2 ? searchResultsProcessed : allItemsProcessed;
   const isLoading = searchTerm.length >= 2 ? isSearching : isLoadingAll;
 
-  const getCountryFlag = (countryName: string) => {
-    const countryFlags: Record<string, string> = {
-      "Argentina": "ar", "Australia": "au", "Brazil": "br", "Canada": "ca",
-      "Chile": "cl", "Mexico": "mx", "Russia": "ru", "USA": "us",
-      "United States": "us", "South Korea": "kr", "India": "in",
-      "Algeria": "dz", "Angola": "ao"
-    };
-    const code = countryFlags[countryName] || "un";
-    return `https://flagcdn.com/w20/${code.toLowerCase()}.png`;
+  const getCountryFlag = (item: SearchResult) => {
+    const code = item.iso_code || DEFAULT_COUNTRY_CODE;
+    return (
+      <ReactCountryFlag
+        countryCode={code}
+        svg
+        style={{
+          width: '20px',
+          height: '15px'
+        }}
+      />
+    );
   };
 
   // Helper function to determine price trend and get appropriate icon
@@ -208,7 +212,7 @@ export const CommandSearch: React.FC<CommandSearchProps> = ({
                   <div className="flex items-center space-x-3 min-w-0">
                     {type === "country" ? (
                       <div className="flex items-center justify-center rounded-sm shrink-0">
-                        <FlagIcon isoCode={item.iso_code} title={`${item.name} flag`} className="h-8 w-8 object-cover" />
+                        {getCountryFlag(item)}
                       </div>
                     ) : (
                       <Pill className="h-5 w-5 text-primary shrink-0" />

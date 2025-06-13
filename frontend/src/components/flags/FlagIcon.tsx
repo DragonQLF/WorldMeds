@@ -18,9 +18,7 @@ const FlagIcon: React.FC<FlagIconProps> = ({ isoCode, title, className }) => {
   // Add to context cache when loaded
   useEffect(() => {
     if (!loadedFlags.has(isoCode)) {
-      const img = new Image();
-      img.onload = () => addLoadedFlag(isoCode);
-      img.src = `https://flagcdn.com/${isoCode.toLowerCase()}.svg`;
+      addLoadedFlag(isoCode);
     }
   }, [isoCode, loadedFlags, addLoadedFlag]);
 
