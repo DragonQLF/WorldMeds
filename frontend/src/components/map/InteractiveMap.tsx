@@ -114,20 +114,23 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       try {
         // Use the fetchCurrencyRates function from api.ts
         const rates = await fetchCurrencyRates();
+        console.log('Loaded currency rates:', rates);
         setCurrencyRates(rates);
       } catch (error) {
+        console.error('Error loading currency rates:', error);
         // We'll still have fallback rates from the API module
       }
     };
     
     loadCurrencyRates();
-  }, []);
+  }, [selectedMonth]); // Reload rates when month changes
 
   // Currency conversion function
   const convertToUSDWithRates = useCallback(async (amount: number, currency: string) => {
     if (!currency || currency.toUpperCase() === 'USD') return amount;
     
     try {
+      // If we don't have the rate cached, get it from the API
       const rate = currencyRates[currency.toLowerCase()];
       if (!rate) {
         console.warn(`No rate found for ${currency}, fetching from API`);
@@ -137,7 +140,7 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       }
       
       // If currency is not USD, and we have a rate, convert to USD
-      // API rates are USD to currency we divide
+      // API rates are USD to currency, so we divide
       return amount / rate;
     } catch (error) {
       console.warn(`Error converting ${currency} to USD:`, error);
@@ -269,31 +272,30 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
           // Default averagePrice to originalPrice (will be converted if needed)
           let averagePrice = originalPrice;
           
-          // Convert to USD if needed and value is valid
-          if (originalPrice !== null && country.localCurrency && country.localCurrency !== 'USD') {
+          // Convert price to USD if needed
+          if (averagePrice !== null && country.localCurrency && country.localCurrency !== 'USD') {
             try {
-              averagePrice = await convertToUSDWithRates(originalPrice, country.localCurrency);
+              averagePrice = await convertToUSDWithRates(averagePrice, country.localCurrency);
             } catch (err) {
               console.warn(`Currency conversion failed for ${country.countryName}:`, err);
               // Keep averagePrice as originalPrice if conversion fails
             }
           }
           
-          const generatedColor = stringToColor(country.countryId); /* Assign generated color */
-          console.log(`Country ID: ${country.countryId}, Generated Color: ${generatedColor}`);
+          const generatedColor = stringToColor(country.countryId);
           
           return {
             countryId: country.countryId,
             countryName: country.countryName,
-            iso_code: country.iso_code,
-            originalPrice: originalPrice,       // Package price in local currency
-            averagePrice: averagePrice,         // Package price converted to USD
-            previousPrice: previousPrices[country.countryId],
-            totalMedicines: country.totalMedicines || 0,
-            localCurrency: country.localCurrency || 'USD',
+            averagePrice: averagePrice,
+            originalPrice: originalPrice,
+            previousPrice: country.previousPrice,
+            localCurrency: country.localCurrency,
+            totalMedicines: country.totalMedicines,
             pillsPerPackage: country.pillsPerPackage,
-            month: country.month || selectedMonth,
-            bgColor: generatedColor,
+            month: country.month,
+            iso_code: country.iso_code,
+            bgColor: generatedColor
           };
         }));
         
@@ -313,11 +315,15 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
 
   // Fetch data when date filters change or useTimeFiltering changes
   useEffect(() => {
-    console.log("Date parameters changed, fetching new data");
-    console.log("Selected Month:", selectedMonth);
-    console.log("Selected Date:", selectedDate);
-    console.log("Date Range:", dateRange);
-    console.log("Use Time Filtering:", useTimeFiltering);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Date parameters:', {
+        selectedMonth,
+        selectedDate,
+        dateRange,
+        useTimeFiltering,
+        monthParam: selectedMonth ? `?month=${selectedMonth}` : null
+      });
+    }
     fetchData();
   }, [selectedDate, dateRange, selectedMonth, useTimeFiltering]);
 
@@ -381,22 +387,20 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       const options = { passive: true };
 
       // Add passive listeners for wheel and touch events
-      mapElement.addEventListener('wheel', () => {}, options);
-      mapElement.addEventListener('touchstart', () => {}, options);
-      mapElement.addEventListener('touchmove', () => {}, options);
-      mapElement.addEventListener('touchend', () => {}, options);
-    }
+      const noop = () => {};
+      mapElement.addEventListener('wheel', noop, options);
+      mapElement.addEventListener('touchstart', noop, options);
+      mapElement.addEventListener('touchmove', noop, options);
+      mapElement.addEventListener('touchend', noop, options);
 
-    return () => {
-      // Cleanup listeners on unmount
-      const mapElement = mapContainerRef.current;
-      if (mapElement) {
-        mapElement.removeEventListener('wheel', () => {});
-        mapElement.removeEventListener('touchstart', () => {});
-        mapElement.removeEventListener('touchmove', () => {});
-        mapElement.removeEventListener('touchend', () => {});
-      }
-    };
+      return () => {
+        // Cleanup listeners on unmount
+        mapElement.removeEventListener('wheel', noop);
+        mapElement.removeEventListener('touchstart', noop);
+        mapElement.removeEventListener('touchmove', noop);
+        mapElement.removeEventListener('touchend', noop);
+      };
+    }
   }, []);
 
   const handleCountryClick = useCallback(async (geo: any, event?: React.MouseEvent) => {
@@ -413,6 +417,17 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
     
     const countryName = geo.properties.name;
     console.log("Country clicked:", countryName);
+    
+    // Check if we're just closing a tooltip
+    const existingTooltipIndex = tooltips.findIndex(
+      tooltip => tooltip.country.countryName.toLowerCase() === countryName.toLowerCase()
+    );
+    
+    if (existingTooltipIndex >= 0 && tooltips[existingTooltipIndex].isPinned) {
+      // If tooltip exists and is pinned, just remove it without fetching data
+      setTooltips(prev => prev.filter((_, i) => i !== existingTooltipIndex));
+      return;
+    }
     
     // Case-insensitive matching
     const country = countriesData.find(
@@ -457,22 +472,15 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       console.log("Setting detailCountryId:", country.countryId);
       setDetailCountryId(country.countryId);
     } else {
-      // For tooltips view, toggle tooltip pin on click
+      // For tooltips view, handle tooltip display
       if (event && mapContainerRef.current) {
         const mapRect = mapContainerRef.current.getBoundingClientRect();
         const x = event.clientX - mapRect.left;
         const y = event.clientY - mapRect.top;
         
-        // Check if this country already has a tooltip
-        const existingTooltipIndex = tooltips.findIndex(
-          tooltip => tooltip.country.countryId === country.countryId
-        );
-        
         if (existingTooltipIndex >= 0) {
-          // If pinned, remove it; otherwise pin it
-          if (tooltips[existingTooltipIndex].isPinned) {
-            setTooltips(prev => prev.filter((_, i) => i !== existingTooltipIndex));
-          } else {
+          // If not pinned, pin it
+          if (!tooltips[existingTooltipIndex].isPinned) {
             setTooltips(prev => prev.map((tooltip, i) => 
               i === existingTooltipIndex 
                 ? { ...tooltip, isPinned: true }
@@ -612,7 +620,7 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
 
   return (
     <div 
-      className="relative w-full h-full transition-colors duration-200"
+      className="relative w-full h-full min-h-screen transition-colors duration-200"
       style={{ backgroundColor: mapBgColor }}
       ref={mapContainerRef}
     >

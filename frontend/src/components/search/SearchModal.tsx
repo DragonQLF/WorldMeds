@@ -90,36 +90,64 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     }
     let cancelled = false;
     setConvertingAll(true);
-    Promise.all(
-      allItemsRaw.map(async (item: any) => {
-        // Parse prices from string to number if needed
-        const avgLocal = typeof item.averagePrice === 'string' ? parseFloat(item.averagePrice) : item.averagePrice;
-        const prevLocal = typeof item.previousPrice === 'string' ? parseFloat(item.previousPrice) : item.previousPrice;
-        let avgUSD = avgLocal;
-        if (item.currency && item.currency !== 'USD' && typeof avgLocal === 'number' && !isNaN(avgLocal)) {
-          avgUSD = await convertToUSD(avgLocal, item.currency);
-        }
-        // Determine if there is no price for the selected month/date
-        let noPriceForSelectedMonth = false;
-        if ((selectedMonth && selectedMonth !== 'all') || selectedDate) {
-          if (avgLocal === null || avgLocal === undefined || isNaN(avgLocal)) {
-            noPriceForSelectedMonth = true;
+    
+    // Convert each item's price to USD
+    const convertPrices = async () => {
+      try {
+        const converted = await Promise.all(allItemsRaw.map(async (item: any) => {
+          if (item.currency && 
+              item.currency !== 'USD' && 
+              typeof item.averagePrice === 'number' && 
+              !isNaN(item.averagePrice)) {
+            try {
+              const usdPrice = await convertToUSD(item.averagePrice, item.currency);
+              return {
+                ...item,
+                averagePrice: usdPrice,
+                averagePriceLocal: item.averagePrice,
+                previousPriceLocal: item.previousPrice,
+                noPriceForSelectedMonth: false
+              };
+            } catch (error) {
+              console.error('Error converting price to USD:', error);
+              return {
+                ...item,
+                noPriceForSelectedMonth: false
+              };
+            }
           }
+          return {
+            ...item,
+            noPriceForSelectedMonth: false
+          };
+        }));
+        
+        if (!cancelled) {
+          setAllItems(converted as SearchResult[]);
         }
-        // For the arrow, always use local currency values (not USD)
-        return {
-          ...item,
-          averagePrice: avgUSD, // always USD for display
-          previousPriceLocal: prevLocal, // for arrow/percent
-          averagePriceLocal: avgLocal,   // for arrow/percent
-          currency: 'USD', // for display
-          noPriceForSelectedMonth,
-        };
-      })
-    ).then((converted) => {
-      if (!cancelled) setAllItems(converted as SearchResult[]);
-      setConvertingAll(false);
-    });
+      } catch (error) {
+        console.error('Error converting prices:', error);
+        if (!cancelled) {
+          // On error, use original prices
+          const fallback = allItemsRaw.map((item: any) => ({
+            ...item,
+            averagePrice: parseFloat(item.averagePrice) || 0,
+            previousPriceLocal: parseFloat(item.previousPrice) || 0,
+            averagePriceLocal: parseFloat(item.averagePrice) || 0,
+            currency: item.currency || 'USD',
+            noPriceForSelectedMonth: false,
+          }));
+          setAllItems(fallback as SearchResult[]);
+        }
+      } finally {
+        if (!cancelled) {
+          setConvertingAll(false);
+        }
+      }
+    };
+    
+    convertPrices();
+    
     return () => { cancelled = true; };
   }, [allItemsRaw, type, selectedMonth, selectedDate]);
   
@@ -147,33 +175,64 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     }
     let cancelled = false;
     setConvertingSearch(true);
-    Promise.all(
-      searchResultsRaw.map(async (item: any) => {
-        const avgLocal = typeof item.averagePrice === 'string' ? parseFloat(item.averagePrice) : item.averagePrice;
-        const prevLocal = typeof item.previousPrice === 'string' ? parseFloat(item.previousPrice) : item.previousPrice;
-        let avgUSD = avgLocal;
-        if (item.currency && item.currency !== 'USD' && typeof avgLocal === 'number' && !isNaN(avgLocal)) {
-          avgUSD = await convertToUSD(avgLocal, item.currency);
-        }
-        let noPriceForSelectedMonth = false;
-        if ((selectedMonth && selectedMonth !== 'all') || selectedDate) {
-          if (avgLocal === null || avgLocal === undefined || isNaN(avgLocal)) {
-            noPriceForSelectedMonth = true;
+    
+    // Convert each search result's price to USD
+    const convertPrices = async () => {
+      try {
+        const converted = await Promise.all(searchResultsRaw.map(async (item: any) => {
+          if (item.currency && 
+              item.currency !== 'USD' && 
+              typeof item.averagePrice === 'number' && 
+              !isNaN(item.averagePrice)) {
+            try {
+              const usdPrice = await convertToUSD(item.averagePrice, item.currency);
+              return {
+                ...item,
+                averagePrice: usdPrice,
+                averagePriceLocal: item.averagePrice,
+                previousPriceLocal: item.previousPrice,
+                noPriceForSelectedMonth: false
+              };
+            } catch (error) {
+              console.error('Error converting price to USD:', error);
+              return {
+                ...item,
+                noPriceForSelectedMonth: false
+              };
+            }
           }
+          return {
+            ...item,
+            noPriceForSelectedMonth: false
+          };
+        }));
+        
+        if (!cancelled) {
+          setSearchResults(converted as SearchResult[]);
         }
-        return {
-          ...item,
-          averagePrice: avgUSD,
-          previousPriceLocal: prevLocal,
-          averagePriceLocal: avgLocal,
-          currency: 'USD',
-          noPriceForSelectedMonth,
-        };
-      })
-    ).then((converted) => {
-      if (!cancelled) setSearchResults(converted as SearchResult[]);
-      setConvertingSearch(false);
-    });
+      } catch (error) {
+        console.error('Error converting prices:', error);
+        if (!cancelled) {
+          // On error, use original prices
+          const fallback = searchResultsRaw.map((item: any) => ({
+            ...item,
+            averagePrice: parseFloat(item.averagePrice) || 0,
+            previousPriceLocal: parseFloat(item.previousPrice) || 0,
+            averagePriceLocal: parseFloat(item.averagePrice) || 0,
+            currency: item.currency || 'USD',
+            noPriceForSelectedMonth: false,
+          }));
+          setSearchResults(fallback as SearchResult[]);
+        }
+      } finally {
+        if (!cancelled) {
+          setConvertingSearch(false);
+        }
+      }
+    };
+    
+    convertPrices();
+    
     return () => { cancelled = true; };
   }, [searchResultsRaw, type, selectedMonth, selectedDate]);
   

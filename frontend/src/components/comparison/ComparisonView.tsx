@@ -139,13 +139,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
     
     // Always use USD for multiple countries comparison
     if (displayData.length > 0) {
-      for (let i = 0; i < displayData.length; i++) {
-        const item = displayData[i];
+      // Convert current prices to USD
+      await Promise.all(displayData.map(async (item) => {
         if (item.currency && item.currency.toUpperCase() !== 'USD') {
           try {
-            // Use the month of the current price for historical rates
-            const rateDate = item.month ? new Date(item.month).toISOString().split('T')[0] : undefined;
-            const usdPrice = await convertToUSD(item.price, item.currency, rateDate);
+            const month = item.month ? new Date(item.month).toISOString().split('T')[0] : undefined;
+            const usdPrice = await convertToUSD(item.price, item.currency, month);
             item.displayPrice = usdPrice;
             item.displayCurrency = 'USD';
           } catch (error) {
@@ -163,22 +162,20 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
           item.displayTrendData = await Promise.all(item.trendData.map(async (trendItem: any) => {
             if (trendItem.currency && trendItem.currency.toUpperCase() !== 'USD') {
               try {
-                // Use the month of the trend data for historical rates
-                const rateDate = trendItem.month ? new Date(trendItem.month).toISOString().split('T')[0] : undefined;
-                const usdTrendPrice = await convertToUSD(trendItem.price, trendItem.currency, rateDate);
-                return { ...trendItem, price: usdTrendPrice, currency: 'USD' };
+                const month = trendItem.month ? new Date(trendItem.month).toISOString().split('T')[0] : undefined;
+                const usdPrice = await convertToUSD(trendItem.price, trendItem.currency, month);
+                return { ...trendItem, price: usdPrice, currency: 'USD' };
               } catch (error) {
                 console.error("Error converting trend price to USD:", error);
-                return trendItem; // Return original if conversion fails
+                return trendItem;
               }
-            } else {
-              return trendItem;
             }
+            return trendItem;
           }));
         } else {
           item.displayTrendData = [];
         }
-      }
+      }));
     }
     
     return displayData;

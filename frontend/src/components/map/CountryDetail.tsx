@@ -182,341 +182,345 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
       if (!open) onClose();
     }}>
       <SheetContent 
-        className="w-full sm:max-w-md overflow-y-auto bg-background dark:bg-background border dark:border-border overflow-hidden" 
+        className="w-full sm:max-w-md bg-background dark:bg-background border dark:border-border" 
         side="right"
       >
-        <DetailHeader 
-          title={countryDetails?.name || "Country Details"}
-          description="Medicine pricing and consumption details"
-        />
+        <div className="h-full flex flex-col">
+          <DetailHeader 
+            title={countryDetails?.name || "Country Details"}
+            description="Medicine pricing and consumption details"
+          />
 
-        {!isAuthenticated ? (
-          <div className="space-y-4 my-6">
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Authentication Required</AlertTitle>
-              <AlertDescription>
-                You must be logged in to view country medicine details.
-              </AlertDescription>
-            </Alert>
-            <Button onClick={openAuthModal} className="w-full">
-              Log in to access data
-            </Button>
-          </div>
-        ) : isLoading ? (
-          <LoadingState message="Loading country details..." />
-        ) : countryDetails ? (
-          <div className="space-y-6">
-            {/* Month selector */}
-            <div className="flex items-center gap-2">
-              <div 
-                ref={calendarButtonRef} 
-                className="flex-1 flex items-center space-x-2 cursor-pointer border rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                onClick={() => setMonthPickerOpen(!monthPickerOpen)}
-              >
-                <Calendar className="h-4 w-4" />
-                <div className="flex-1 text-sm">{getCurrentSelectionLabel(selectedMonth)}</div>
+          <div className="flex-1 overflow-y-auto pr-6 -mr-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-500">
+            {!isAuthenticated ? (
+              <div className="space-y-4 my-6">
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Authentication Required</AlertTitle>
+                  <AlertDescription>
+                    You must be logged in to view country medicine details.
+                  </AlertDescription>
+                </Alert>
+                <Button onClick={openAuthModal} className="w-full">
+                  Log in to access data
+                </Button>
               </div>
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-full"
-                    >
-                      <InfoIcon className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left" align="center" className="max-w-[220px]">
-                    <p>Select a specific month to view medicine prices and consumption data for that period</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            
-            <MonthPicker 
-              isOpen={monthPickerOpen} 
-              onClose={() => setMonthPickerOpen(false)} 
-              position="right"
-              anchor={calendarButtonRef}
-            />
-          
-            {countryDetails.currency && countryDetails.currency !== 'USD' && (
-              <CurrencyToggle
-                showLocalCurrency={showLocalCurrency}
-                onToggle={setShowLocalCurrency}
-                localCurrencyCode={countryDetails.currency}
-              />
-            )}
-            
-            {/* Historical Price Chart Section */}
-            {chartData.labels.length > 0 && (
-              <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
-                 <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
-                  Historical Average Price
+            ) : isLoading ? (
+              <LoadingState message="Loading country details..." />
+            ) : countryDetails ? (
+              <div className="space-y-6 pb-6">
+                {/* Month selector */}
+                <div className="flex items-center gap-2">
+                  <div 
+                    ref={calendarButtonRef} 
+                    className="flex-1 flex items-center space-x-2 cursor-pointer border rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => setMonthPickerOpen(!monthPickerOpen)}
+                  >
+                    <Calendar className="h-4 w-4" />
+                    <div className="flex-1 text-sm">{getCurrentSelectionLabel(selectedMonth)}</div>
+                  </div>
+                  
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="cursor-help">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-full"
+                        >
                           <InfoIcon className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                        </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[250px]">
-                        <p>Average price of medicines over time in {countryDetails.name}</p>
+                      <TooltipContent side="left" align="center" className="max-w-[220px]">
+                        <p>Select a specific month to view medicine prices and consumption data for that period</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                </h3>
-                {isLargeScreen ? (
-                  <Button 
-                    onClick={() => setIsHistoryModalOpen(true)} 
-                    className="w-full"
-                    variant="ghost"
-                  >
-                    View Historical Graph
-                  </Button>
-                ) : isLoadingHistorical ? (
-                   <LoadingState message="Loading historical data..." />
-                ) : (
-                   <div style={{ height: '300px' }}>
-                      <HistoryChart data={chartData} title="Average Price History" yAxisLabel="Price (USD)" />
-                   </div>
+                </div>
+                
+                <MonthPicker 
+                  isOpen={monthPickerOpen} 
+                  onClose={() => setMonthPickerOpen(false)} 
+                  position="right"
+                  anchor={calendarButtonRef}
+                />
+              
+                {countryDetails.currency && countryDetails.currency !== 'USD' && (
+                  <CurrencyToggle
+                    showLocalCurrency={showLocalCurrency}
+                    onToggle={setShowLocalCurrency}
+                    localCurrencyCode={countryDetails.currency}
+                  />
                 )}
-              </div>
-            )}
 
-            {/* Overview Section */}
-            <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
-              <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
-                Overview
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="cursor-help">
-                        <InfoIcon className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[250px]">
-                      <p>Summary of medicine prices and consumption in {countryDetails.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <span className="text-sm text-muted-foreground">Currency</span>
-                  <span className="font-medium">
-                    {countryDetails.currency}
+                {/* Overview Section */}
+                <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
+                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                    Overview
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="inline-block cursor-help">
-                            <InfoIcon className="inline-block h-3 w-3 ml-1 text-muted-foreground" />
+                          <div className="cursor-help">
+                            <InfoIcon className="h-4 w-4 text-muted-foreground" />
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Local currency used for medicine prices</p>
+                        <TooltipContent side="top" className="max-w-[250px]">
+                          <p>Summary of medicine prices and consumption in {countryDetails.name}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm text-muted-foreground">Total Quantity Bought</span>
-                  <span className="font-medium">{countryDetails.total_medicines?.toLocaleString()}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm text-muted-foreground">Average Package Price</span>
-                  <div className="font-medium flex items-center">
-                    {showLocalCurrency ? getCurrencySymbol(countryDetails.currency) : '$'}
-                    {formatPrice(
-                      countryDetails.avg_price,
-                      countryDetails.currency,
-                      showLocalCurrency,
-                      conversionRate
-                    )}
-                    {(() => {
-                      const priceChange = calculatePriceChange(
-                        countryDetails.avg_price,
-                        previousMonthCountryData?.avg_price
-                      );
-                      return priceChange ? (
-                        <span className={`ml-2 flex items-center text-sm ${ 
-                          priceChange.increased ? 'text-red-500' : 'text-emerald-500'
-                        }`}>
-                          {priceChange.increased ? (
-                            <TrendingUp className="h-4 w-4 mr-1" />
-                          ) : (
-                            <TrendingDown className="h-4 w-4 mr-1" />
-                          )}
-                          {priceChange.percentage}
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <InfoIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="text-xs">
-                                <p>
-                                  {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage} since previous month
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </span>
-                      ) : null;
-                    })()}
-                    {countryDetails.using_reference_price > 0 && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="ml-1.5 cursor-help">
-                              <AlertTriangle className="h-4 w-4 text-amber-500" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>No sales price available. Using reference price.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Top Medicines Section */}
-            <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
-              <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
-                Top Medicines
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="cursor-help">
-                        <InfoIcon className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[250px]">
-                      <p>Most purchased medicines in {countryDetails.name}, sorted by quantity sold</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </h3>
-              {isLoadingMedicines ? (
-                <LoadingState message="Loading medicines..." />
-              ) : (
-                <div className="space-y-3">
-                  {topMedicines.map((medicine: any) => {
-                    const previousMedicine = previousMonthCountryData?.topMedicines?.find(
-                      (prevMed: any) => prevMed.name === medicine.name
-                    );
-                    const priceChange = calculatePriceChange(
-                      medicine.averagePrice,
-                      previousMedicine?.averagePrice
-                    );
-                    
-                    return (
-                      <div key={medicine.name} className="border-b dark:border-border pb-2 last:border-0">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{medicine.name}</span>
-                          <div className="flex items-center">
-                            <span>
-                              {showLocalCurrency ? getCurrencySymbol(countryDetails.currency) : '$'}
-                              {formatPrice(
-                                medicine.averagePrice,
-                                countryDetails.currency,
-                                showLocalCurrency,
-                                conversionRate
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground">Currency</span>
+                      <span className="font-medium">
+                        {countryDetails.currency}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="inline-block cursor-help">
+                                <InfoIcon className="inline-block h-3 w-3 ml-1 text-muted-foreground" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p>Local currency used for medicine prices</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground">Total Quantity Bought</span>
+                      <span className="font-medium">{countryDetails.total_medicines?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground">Average Package Price</span>
+                      <div className="font-medium flex items-center">
+                        {showLocalCurrency ? getCurrencySymbol(countryDetails.currency) : '$'}
+                        {formatPrice(
+                          countryDetails.avg_price,
+                          countryDetails.currency,
+                          showLocalCurrency,
+                          conversionRate
+                        )}
+                        {(() => {
+                          const priceChange = calculatePriceChange(
+                            countryDetails.avg_price,
+                            previousMonthCountryData?.avg_price
+                          );
+                          return priceChange ? (
+                            <span className={`ml-2 flex items-center text-sm ${ 
+                              priceChange.increased ? 'text-red-500' : 'text-emerald-500'
+                            }`}>
+                              {priceChange.increased ? (
+                                <TrendingUp className="h-4 w-4 mr-1" />
+                              ) : (
+                                <TrendingDown className="h-4 w-4 mr-1" />
                               )}
-                            </span>
-                            
-                            {priceChange && (
-                              <span className={`ml-2 flex items-center text-sm ${ 
-                                priceChange.increased ? 'text-red-500' : 'text-emerald-500'
-                              }`}>
-                                {priceChange.increased ? (
-                                  <TrendingUp className="h-4 w-4 mr-1" />
-                                ) : (
-                                  <TrendingDown className="h-4 w-4 mr-1" />
-                                )}
-                                {priceChange.percentage}
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <InfoIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-xs">
-                                      <p>
-                                        {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage} since previous month
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </span>
-                            )}
-                            
-                            {medicine.using_reference_price > 0 && (
+                              {priceChange.percentage}
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <div className="ml-1 cursor-help">
-                                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                    </div>
+                                    <InfoIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
                                   </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>No sales price available. Using reference price.</p>
+                                  <TooltipContent side="top" className="text-xs">
+                                    <p>
+                                      {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage} since previous month
+                                    </p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex justify-between text-sm text-muted-foreground">
+                            </span>
+                          ) : null;
+                        })()}
+                        {countryDetails.using_reference_price > 0 && (
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="cursor-help">{medicine.dosage}</span>
+                                <div className="ml-1.5 cursor-help">
+                                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                </div>
                               </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p>Strength and formulation</p>
+                              <TooltipContent>
+                                <p>No sales price available. Using reference price.</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help">Bought: {medicine.totalSold}</span>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <p>Units/packages purchased</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
+                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Historical Price Chart Section */}
+                {chartData.labels.length > 0 && (
+                  <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
+                     <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                      Historical Average Price
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="cursor-help">
+                              <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[250px]">
+                            <p>Average price of medicines over time in {countryDetails.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </h3>
+                    {isLargeScreen ? (
+                      <Button 
+                        onClick={() => setIsHistoryModalOpen(true)} 
+                        className="w-full"
+                        variant="ghost"
+                      >
+                        View Historical Graph
+                      </Button>
+                    ) : isLoadingHistorical ? (
+                       <LoadingState message="Loading historical data..." />
+                    ) : (
+                       <div style={{ height: '300px' }}>
+                          <HistoryChart data={chartData} title="Average Price History" yAxisLabel="Price (USD)" />
+                       </div>
+                    )}
+                  </div>
+                )}
 
-                  {topMedicines.length === 0 && (
-                    <p className="text-center py-2">No medicines found</p>
+                {/* Top Medicines Section */}
+                <div className="bg-card dark:bg-card rounded-lg p-4 shadow-sm">
+                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                    Top Medicines
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-help">
+                            <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[250px]">
+                          <p>Most purchased medicines in {countryDetails.name}, sorted by quantity sold</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </h3>
+                  {isLoadingMedicines ? (
+                    <LoadingState message="Loading medicines..." />
+                  ) : (
+                    <div className="space-y-3">
+                      {topMedicines.map((medicine: any) => {
+                        const previousMedicine = previousMonthCountryData?.topMedicines?.find(
+                          (prevMed: any) => prevMed.name === medicine.name
+                        );
+                        const priceChange = calculatePriceChange(
+                          medicine.averagePrice,
+                          previousMedicine?.averagePrice
+                        );
+                        
+                        return (
+                          <div key={medicine.name} className="border-b dark:border-border pb-2 last:border-0">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{medicine.name}</span>
+                              <div className="flex items-center">
+                                <span>
+                                  {showLocalCurrency ? getCurrencySymbol(countryDetails.currency) : '$'}
+                                  {formatPrice(
+                                    medicine.averagePrice,
+                                    countryDetails.currency,
+                                    showLocalCurrency,
+                                    conversionRate
+                                  )}
+                                </span>
+                                
+                                {priceChange && (
+                                  <span className={`ml-2 flex items-center text-sm ${ 
+                                    priceChange.increased ? 'text-red-500' : 'text-emerald-500'
+                                  }`}>
+                                    {priceChange.increased ? (
+                                      <TrendingUp className="h-4 w-4 mr-1" />
+                                    ) : (
+                                      <TrendingDown className="h-4 w-4 mr-1" />
+                                    )}
+                                    {priceChange.percentage}
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <InfoIcon className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-xs">
+                                          <p>
+                                            {priceChange.increased ? 'Increased' : 'Decreased'} by {priceChange.percentage} since previous month
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </span>
+                                )}
+                                
+                                {medicine.using_reference_price > 0 && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="ml-1 cursor-help">
+                                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>No sales price available. Using reference price.</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help">{medicine.dosage}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <p>Strength and formulation</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help">Bought: {medicine.totalSold}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <p>Units/packages purchased</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {topMedicines.length === 0 && (
+                        <p className="text-center py-2">No medicines found</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {isAuthenticated && (
-              <Button 
-                onClick={() => navigate(`/country/${countryId}/stats`)} 
-                className="w-full"
-              >
-                View Detailed Statistics
-              </Button>
+                {isAuthenticated && (
+                  <Button 
+                    onClick={() => navigate(`/country/${countryId}/stats`)} 
+                    className="w-full"
+                  >
+                    View Detailed Statistics
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <LoadingState message="No country details available" />
             )}
           </div>
-        ) : (
-          <LoadingState message="No country details available" />
-        )}
+        </div>
       </SheetContent>
 
       {/* Render modal for large screens */}
@@ -526,6 +530,9 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ countryId, onClose
           onClose={() => setIsHistoryModalOpen(false)} 
           chartData={chartData} 
           countryName={countryDetails.name}
+          showLocalCurrency={showLocalCurrency}
+          conversionRate={conversionRate}
+          localCurrencyCode={countryDetails.currency}
         />
       )}
     </Sheet>

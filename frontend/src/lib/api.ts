@@ -2,7 +2,10 @@ import axios, { AxiosError, AxiosHeaders } from "axios";
 
 // Use the environment variable defined in the .env file
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const CURRENCY_API_URL = import.meta.env.VITE_CURRENCY_API_URL || 'https://latest.currency-api.pages.dev/v1/currencies/usd.json';
+
+// Primary and fallback currency API URLs
+const PRIMARY_CURRENCY_API_URL = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json';
+const FALLBACK_CURRENCY_API_URL = 'https://latest.currency-api.pages.dev/v1/currencies/usd.json';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -78,41 +81,68 @@ export const fetchCurrencyRates = async (date?: string): Promise<Record<string, 
       return currencyRatesCache.rates;
     }
     
-    // If no valid cache, fetch from the API
-    const response = await api.get('/currency-rates', { params: { date } });
-    
-    if (response.data && Object.keys(response.data).length > 0) {
-      currencyRatesCache = {
-        timestamp: Date.now(),
-        rates: response.data,
-        date: date || 'latest'
-      };
-      return response.data;
+    // If no valid cache, fetch from the backend first
+    try {
+      const response = await api.get('/currency-rates', { params: { date } });
+      if (response.data && Object.keys(response.data).length > 0) {
+        currencyRatesCache = {
+          timestamp: Date.now(),
+          rates: response.data,
+          date: date || 'latest'
+        };
+        return response.data;
+      }
+      console.warn('Backend returned no/empty data for currency rates (frontend).');
+    } catch (backendError) {
+      console.warn('Backend currency rates fetch failed, trying direct API...', backendError);
     }
-    console.warn('Backend returned no/empty data for currency rates (frontend).');
     
-    // If backend fails, try direct API call
-    const apiUrl = date 
-      ? `https://${date}.currency-api.pages.dev/v1/currencies/usd.json`
-      : CURRENCY_API_URL;
-    
-    const responseDirect = await axios.get(apiUrl);
-    
-    if (responseDirect.data && responseDirect.data.usd) {
-      const normalizedRates: Record<string, number> = {};
-      Object.entries(responseDirect.data.usd).forEach(([key, value]) => {
-        normalizedRates[key.toLowerCase()] = value as number;
-      });
+    // If backend fails, try primary API
+    const primaryUrl = date 
+      ? `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${date}/v1/currencies/usd.json`
+      : PRIMARY_CURRENCY_API_URL;
       
-      currencyRatesCache = {
-        timestamp: Date.now(),
-        rates: normalizedRates,
-        date: date || 'latest'
-      };
+    try {
+      const primaryResponse = await axios.get(primaryUrl);
+      if (primaryResponse.data && primaryResponse.data.usd) {
+        const normalizedRates: Record<string, number> = {};
+        Object.entries(primaryResponse.data.usd).forEach(([key, value]) => {
+          normalizedRates[key.toLowerCase()] = value as number;
+        });
+        
+        currencyRatesCache = {
+          timestamp: Date.now(),
+          rates: normalizedRates,
+          date: date || 'latest'
+        };
+        
+        return normalizedRates;
+      }
+      throw new Error('Invalid response format from primary currency API');
+    } catch (primaryError) {
+      console.warn('Primary API failed, trying fallback...', primaryError);
       
-      return normalizedRates;
-    } else {
-      throw new Error('Invalid response format from direct currency API (frontend)');
+      // If primary API fails, try fallback
+      const fallbackUrl = date 
+        ? `https://${date}.currency-api.pages.dev/v1/currencies/usd.json`
+        : FALLBACK_CURRENCY_API_URL;
+        
+      const fallbackResponse = await axios.get(fallbackUrl);
+      if (fallbackResponse.data && fallbackResponse.data.usd) {
+        const normalizedRates: Record<string, number> = {};
+        Object.entries(fallbackResponse.data.usd).forEach(([key, value]) => {
+          normalizedRates[key.toLowerCase()] = value as number;
+        });
+        
+        currencyRatesCache = {
+          timestamp: Date.now(),
+          rates: normalizedRates,
+          date: date || 'latest'
+        };
+        
+        return normalizedRates;
+      }
+      throw new Error('Invalid response format from fallback currency API');
     }
   } catch (error) {
     console.error('Error fetching currency rates (frontend):', error instanceof Error ? error.message : error);
@@ -123,9 +153,6 @@ export const fetchCurrencyRates = async (date?: string): Promise<Record<string, 
         code: axiosError.code,
         status: axiosError.response?.status,
       });
-      if (axiosError.response?.status === 401) {
-        console.error("Received 401 Unauthorized from direct currency API. Check if API key/access changed.");
-      }
     }
     
     console.warn('Falling back to static currency rates (frontend)');
@@ -267,9 +294,8 @@ export const convertToUSD = async (
   }
   
   try {
-    const rate = await getCurrencyRate(currency, 'usd', date);
-    const convertedAmount = numericAmount * rate;
-    return parseFloat(convertedAmount.toFixed(2));
+    const rate = await getCurrencyRate(currency, 'usd');
+    return parseFloat((numericAmount * rate).toFixed(2));
   } catch (error) {
     console.error('Error converting currency:', error);
     return numericAmount; // Return original amount if conversion fails

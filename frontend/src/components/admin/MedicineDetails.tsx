@@ -81,39 +81,41 @@ const MedicineDetails: React.FC<MedicineDetailsProps> = ({ medicineId }) => {
   useEffect(() => {
     const convertPrices = async () => {
       // Don't convert if showing in local currency
-      if (showLocalCurrency || !transactions.length) {
+      if (showLocalCurrency || (!transactions.length && !countries.length)) {
         return;
       }
       
       const newPrices: Record<string, number> = {};
       
       // Convert transaction prices
-      for (const transaction of transactions) {
-        if (transaction.currency && transaction.currency !== 'USD') {
+      await Promise.all(transactions.map(async (t) => {
+        if (t.currency && t.currency !== 'USD') {
           try {
-            // Use the transaction date for historical rates
-            const rateDate = transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : undefined;
-            const convertedPrice = await convertToUSD(transaction.price, transaction.currency, rateDate);
-            newPrices[`transaction-${transaction.id}`] = convertedPrice;
+            const usdPrice = await convertToUSD(t.price, t.currency, t.date);
+            newPrices[`transaction-${t.id}`] = usdPrice;
           } catch (error) {
-            console.error(`Failed to convert price for transaction ${transaction.id}:`, error);
+            console.error('Error converting transaction price:', error);
+            newPrices[`transaction-${t.id}`] = t.price;
           }
+        } else {
+          newPrices[`transaction-${t.id}`] = t.price;
         }
-      }
+      }));
       
       // Convert country prices
-      for (const country of countries) {
-        if (country.currency && country.currency !== 'USD') {
+      await Promise.all(countries.map(async (c) => {
+        if (c.currency && c.currency !== 'USD') {
           try {
-            // Use the last update date for historical rates
-            const rateDate = country.lastUpdate ? new Date(country.lastUpdate).toISOString().split('T')[0] : undefined;
-            const convertedPrice = await convertToUSD(country.lastPrice, country.currency, rateDate);
-            newPrices[`country-${country.id}`] = convertedPrice;
+            const usdPrice = await convertToUSD(c.lastPrice, c.currency, c.lastUpdate);
+            newPrices[`country-${c.id}`] = usdPrice;
           } catch (error) {
-            console.error(`Failed to convert price for country ${country.id}:`, error);
+            console.error('Error converting country price:', error);
+            newPrices[`country-${c.id}`] = c.lastPrice;
           }
+        } else {
+          newPrices[`country-${c.id}`] = c.lastPrice;
         }
-      }
+      }));
       
       setConvertedPrices(newPrices);
     };

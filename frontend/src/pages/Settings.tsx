@@ -1,221 +1,41 @@
 import React from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { useAuth } from "@/contexts/AuthContext";
-import { useMapContext } from "@/contexts/MapContext";
-import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, User, Shield, Mail, Moon, Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon } from "lucide-react";
 
 export default function Settings() {
-  const { user } = useAuth();
-  const { showPricePerPill, setShowPricePerPill } = useMapContext();
-
-  const handlePasswordChange = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Add password change logic here
-    toast({
-      title: "Password updated",
-      description: "Your password has been successfully changed.",
-    });
-  };
-
-  const handleNotificationChange = () => {
-    toast({
-      title: "Notification settings updated",
-      description: "Your notification preferences have been saved.",
-    });
-  };
-
-  const handlePricePerPillChange = (checked: boolean) => {
-    setShowPricePerPill(checked);
-    toast({
-      title: "Display settings updated",
-      description: `Prices will now be shown ${checked ? "per pill" : "per package"}.`,
-    });
-  };
-
   return (
     <Layout>
-      <div className="flex-1 space-y-6 p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
         </div>
 
-        <Tabs defaultValue="account" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="account" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Account
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Security
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              Notifications
-            </TabsTrigger>
-            <TabsTrigger value="display" className="flex items-center gap-2">
-              <SettingsIcon className="h-4 w-4" />
-              Display
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="account" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
+        <Card className="w-full max-w-2xl mx-auto">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <SettingsIcon className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <CardTitle>Settings Under Development</CardTitle>
                 <CardDescription>
-                  Update your account profile information and email address.
+                  We're working hard to bring you customizable settings soon.
                 </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First name</Label>
-                    <Input id="firstName" placeholder="John" defaultValue={user?.firstName} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last name</Label>
-                    <Input id="lastName" placeholder="Doe" defaultValue={user?.lastName} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="flex items-center space-x-2">
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      defaultValue={user?.email} 
-                      disabled
-                      className="cursor-not-allowed opacity-90"
-                    />
-                    <Button variant="outline">Verify Email</Button>
-                  </div>
-                </div>
-                <Button>Save Changes</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="security" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Password</CardTitle>
-                <CardDescription>
-                  Change your password here. After saving, you'll need to log in again.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <form onSubmit={handlePasswordChange} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="current">Current password</Label>
-                    <Input id="current" type="password" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new">New password</Label>
-                    <Input id="new" type="password" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm">Confirm password</Label>
-                    <Input id="confirm" type="password" />
-                  </div>
-                  <Button type="submit">Change Password</Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Two-Factor Authentication</CardTitle>
-                <CardDescription>
-                  Add additional security to your account using two-factor authentication.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Two-factor authentication</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Secure your account with 2FA.
-                    </p>
-                  </div>
-                  <Switch />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>
-                  Choose what notifications you want to receive.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Price Alerts</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when medicine prices change significantly.
-                    </p>
-                  </div>
-                  <Switch onCheckedChange={handleNotificationChange} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Stock Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive alerts about medicine availability.
-                    </p>
-                  </div>
-                  <Switch onCheckedChange={handleNotificationChange} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Monthly Reports</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get monthly summary reports of medicine prices and trends.
-                    </p>
-                  </div>
-                  <Switch onCheckedChange={handleNotificationChange} />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="display" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Price Display Settings</CardTitle>
-                <CardDescription>
-                  Configure how medicine prices are displayed throughout the application.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Show Price Per Pill</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Toggle between showing prices per package or per individual pill.
-                    </p>
-                  </div>
-                  <Switch 
-                    checked={showPricePerPill}
-                    onCheckedChange={handlePricePerPillChange}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Our team is currently developing comprehensive settings options to give you more control over your experience.
+              Check back soon for features like:
+            </p>
+            <ul className="list-disc list-inside space-y-2 text-muted-foreground pl-4">
+              <li>Profile customization</li>
+              <li>Notification preferences</li>
+              <li>Display settings</li>
+              <li>Security options</li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

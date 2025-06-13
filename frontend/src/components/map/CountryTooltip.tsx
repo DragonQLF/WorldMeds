@@ -76,12 +76,14 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
     
     // Add event listeners to track map movement and resize
     const handleMapMove = () => updatePosition();
-    window.addEventListener('resize', updatePosition);
+    const options = { passive: true };
+    
+    window.addEventListener('resize', updatePosition, options);
     
     if (mapRef?.current) {
-      mapRef.current.addEventListener('mousemove', handleMapMove);
-      mapRef.current.addEventListener('wheel', handleMapMove);
-      mapRef.current.addEventListener('drag', handleMapMove);
+      mapRef.current.addEventListener('mousemove', handleMapMove, options);
+      mapRef.current.addEventListener('wheel', handleMapMove, options);
+      mapRef.current.addEventListener('drag', handleMapMove, options);
     }
     
     return () => {

@@ -201,7 +201,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
           </SheetTrigger>
           <SheetContent 
             side="left" 
-            className="bg-background border-r border-border shadow-lg backdrop-filter backdrop-blur-none text-foreground w-full max-w-md overflow-y-auto"
+            className="bg-background border-r border-border shadow-lg backdrop-filter backdrop-blur-none text-foreground w-full max-w-md overflow-y-auto z-[100]"
             onCloseAutoFocus={e => {
               // Prevent focus returning to trigger which can cause unwanted side effects
               e.preventDefault();

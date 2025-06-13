@@ -25,7 +25,7 @@ const formatPrice = (price, decimals = 2) => {
 let currencyRatesCache = {
   timestamp: 0,
   rates: {},
-  cacheHits: 0  // Add counter for cache hits
+  cacheHits: 0
 };
 
 /**
@@ -45,56 +45,70 @@ const fetchCurrencyRates = async (date) => {
         (Date.now() - currencyRatesCache.timestamp < CACHE_DURATION) && 
         (!date || currencyRatesCache.date === date)) {
       currencyRatesCache.cacheHits++;
-      process.stdout.write(`\rUsing cached currency rates (backend) (${currencyRatesCache.cacheHits} times)`);
+      process.stdout.write(`\rUsing cached currency rates (${currencyRatesCache.cacheHits} times)`);
       return currencyRatesCache.rates;
     }
     
     // Reset cache hits counter when fetching new rates
     currencyRatesCache.cacheHits = 0;
-    process.stdout.write('\rFetching fresh currency rates from API (backend)...');
+    process.stdout.write('\rFetching fresh currency rates from API...');
     
-    // Construct API URL based on whether a date is provided
-    const apiUrl = date 
+    // Primary URL using jsdelivr
+    const primaryUrl = date 
+      ? `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${date}/v1/currencies/usd.json`
+      : 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json';
+    
+    // Fallback URL using Cloudflare
+    const fallbackUrl = date 
       ? `https://${date}.currency-api.pages.dev/v1/currencies/usd.json`
       : 'https://latest.currency-api.pages.dev/v1/currencies/usd.json';
     
-    // Use node-fetch
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
-      process.stdout.write('\rError fetching currency rates from API\n');
-      throw new Error(`API response error: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data && data.usd) {
-      // Store in cache
-      currencyRatesCache = {
-        timestamp: Date.now(),
-        rates: data.usd,
-        cacheHits: 0,
-        date: date || 'latest'
-      };
-      process.stdout.write('\rCurrency rates updated successfully\n');
-      
-      // Update the static rates with the new data for those currencies that exist
-      Object.keys(STATIC_CURRENCY_RATES).forEach(currency => {
-        if (data.usd[currency.toLowerCase()]) {
-          STATIC_CURRENCY_RATES[currency.toLowerCase()] = data.usd[currency.toLowerCase()];
+    // Try primary URL first
+    try {
+      const response = await fetch(primaryUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.usd) {
+          // Store in cache
+          currencyRatesCache = {
+            timestamp: Date.now(),
+            rates: data.usd,
+            cacheHits: 0,
+            date: date || 'latest'
+          };
+          process.stdout.write('\rCurrency rates updated successfully from primary API\n');
+          return data.usd;
         }
-      });
+      }
+      throw new Error(`Primary API response error: ${response.status} ${response.statusText}`);
+    } catch (primaryError) {
+      console.warn('Primary API failed, trying fallback...', primaryError.message);
       
-      return data.usd;
-    } else {
-      process.stdout.write('\rInvalid response format from currency API\n');
-      throw new Error('Invalid response format from currency API');
+      // Try fallback URL
+      const fallbackResponse = await fetch(fallbackUrl);
+      if (!fallbackResponse.ok) {
+        throw new Error(`Fallback API response error: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+      }
+      
+      const fallbackData = await fallbackResponse.json();
+      if (fallbackData && fallbackData.usd) {
+        // Store in cache
+        currencyRatesCache = {
+          timestamp: Date.now(),
+          rates: fallbackData.usd,
+          cacheHits: 0,
+          date: date || 'latest'
+        };
+        process.stdout.write('\rCurrency rates updated successfully from fallback API\n');
+        return fallbackData.usd;
+      }
+      throw new Error('Invalid response format from fallback API');
     }
   } catch (error) {
-    process.stdout.write('\rError in fetchCurrencyRates (backend)\n');
+    process.stdout.write('\rError in fetchCurrencyRates\n');
     console.error('Error details:', error.message);
     
-    // Fall back to static rates if API call fails
+    // Fall back to static rates if both APIs fail
     process.stdout.write('\rFalling back to static currency rates\n');
     return STATIC_CURRENCY_RATES;
   }
@@ -158,55 +172,37 @@ const preparePriceData = async (price, localCurrency) => {
 };
 
 /**
- * Performs currency conversion from local currency to USD
+ * Converts a single amount to USD using cached rates
  * @param {number} amount - Amount in local currency
  * @param {string} fromCurrency - Source currency code
- * @param {string} [date] - Optional date in YYYY-MM-DD format for historical rates
- * @returns {number} Converted amount in USD
+ * @param {string} [date] - Optional date for historical rates
+ * @returns {Promise<number>} Converted amount in USD
  */
 const convertToUSD = async (amount, fromCurrency, date) => {
-  // Currency codes should always be lowercase for consistency with the API
-  const currency = (fromCurrency?.toLowerCase() || 'usd');
-  
-  // Validate inputs
-  if (amount === null || amount === undefined || isNaN(parseFloat(amount))) {
-    console.warn('Invalid amount for conversion (backend):', amount);
-    return 0;
-  }
-  
-  // Force numeric conversion
-  const numericAmount = parseFloat(amount);
-  
-  // If already USD, return original amount
-  if (currency === 'usd') {
-    return numericAmount;
-  }
-  
   try {
-    // Get the rates from the API (historical if date provided)
+    // Get rates once for the conversion
     const rates = await fetchCurrencyRates(date);
     
-    // If currency not found, return original amount with warning
+    const currency = (fromCurrency?.toLowerCase() || 'usd');
+    const numericAmount = parseFloat(amount);
+    
+    if (numericAmount === null || numericAmount === undefined || isNaN(numericAmount)) {
+      console.warn('Invalid amount for conversion:', amount);
+      return 0;
+    }
+    
+    if (currency === 'usd') return numericAmount;
+    
     if (!rates[currency]) {
-      console.warn(`Currency conversion rate not found for ${currency} (backend), using 1:1 rate`);
+      console.warn(`Currency conversion rate not found for ${currency}, using 1:1 rate`);
       return numericAmount;
     }
     
-    // The API provides values from USD to other currencies
-    // So to convert from other currencies to USD, we need to divide by the rate
-    const convertedAmount = numericAmount / rates[currency];
-    return formatPrice(convertedAmount);
-    
+    // Since rates are USD to currency, we divide to get currency to USD
+    return formatPrice(numericAmount / rates[currency]);
   } catch (error) {
-    console.error('Error in currency conversion (backend):', error);
-    
-    // Fall back to static rates
-    if (STATIC_CURRENCY_RATES[currency]) {
-      const convertedAmount = numericAmount / STATIC_CURRENCY_RATES[currency];
-      return formatPrice(convertedAmount);
-    }
-    
-    return numericAmount; // Return original amount if conversion fails
+    console.error('Error in currency conversion:', error);
+    return parseFloat(amount) || 0;
   }
 };
 
@@ -214,6 +210,6 @@ module.exports = {
   formatPrice,
   preparePriceData,
   convertToUSD,
-  fetchCurrencyRates // Export fetchCurrencyRates
+  fetchCurrencyRates
 };
 

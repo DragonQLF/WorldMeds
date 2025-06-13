@@ -880,6 +880,30 @@ app.get("/api/medicines/:medicineId/available-months", (req, res) => {
   });
 });
 
+// Remove the batch conversion endpoint and update any batch conversions to use individual conversions
+app.get('/api/medicine-prices/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date } = req.query;
+    
+    const prices = await db.collection('prices').find({ medicineId: id }).toArray();
+    
+    // Convert prices individually
+    const convertedPrices = await Promise.all(prices.map(async (price) => {
+      const usdPrice = await convertToUSD(price.amount, price.currency, date);
+      return {
+        ...price,
+        usdPrice
+      };
+    }));
+    
+    res.json(convertedPrices);
+  } catch (error) {
+    console.error('Error fetching medicine prices:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   logger.error('Unhandled error:', { 

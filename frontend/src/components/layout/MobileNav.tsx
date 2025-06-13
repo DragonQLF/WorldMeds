@@ -192,10 +192,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
               </SheetTrigger>
               <SheetContent 
                 side="left" 
-                className="bg-background border-r border-border shadow-lg backdrop-filter backdrop-blur-none text-foreground w-full max-w-md overflow-y-auto"
+                className="bg-background border-r border-border shadow-lg backdrop-filter backdrop-blur-none text-foreground w-full max-w-md overflow-y-auto z-[100]"
                 onCloseAutoFocus={e => {
-                  // When sheet closes, make sure we close the mobile menu too
-                  onClose();
                   // Prevent focus returning to trigger which can cause unwanted side effects
                   e.preventDefault();
                 }}

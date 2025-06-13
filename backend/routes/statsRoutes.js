@@ -97,16 +97,10 @@ router.get("/general", async (req, res) => {
       });
     });
 
-    // Convert all prices to USD and calculate global average
-    const usdPrices = [];
-    for (const item of allPricesResult) {
-      // Use the month of the price data for historical rates
-      const rateDate = item.month ? new Date(item.month).toISOString().split('T')[0] : undefined;
-      const usdPrice = await convertToUSD(item.sale_price, item.currency, rateDate);
-      if (usdPrice && !isNaN(usdPrice)) {
-        usdPrices.push(usdPrice);
-      }
-    }
+    // Convert all prices to USD using direct conversion
+    const usdPrices = await Promise.all(allPricesResult.map(async item => {
+      return await convertToUSD(item.sale_price, item.currency);
+    }));
     stats.averagePrice = usdPrices.length > 0 ? 
       formatPrice(usdPrices.reduce((sum, price) => sum + price, 0) / usdPrices.length) : 0;
 
@@ -129,24 +123,16 @@ router.get("/general", async (req, res) => {
       });
     });
 
-    // Convert country averages to USD and find min/max
-    const countryUSDPrices = [];
-    for (const country of countryAveragesResult) {
-      // Use the month of the price data for historical rates
-      const rateDate = country.month ? new Date(country.month).toISOString().split('T')[0] : undefined;
-      const usdPrice = await convertToUSD(country.avg_price, country.currency, rateDate);
-      if (usdPrice && !isNaN(usdPrice)) {
-        countryUSDPrices.push({
-          country: country.name,
-          averagePrice: formatPrice(usdPrice)
-        });
-      }
-    }
+    // Convert country averages to USD using direct conversion
+    const countryPriceData = await Promise.all(countryAveragesResult.map(async country => ({
+      country: country.name,
+      averagePrice: formatPrice(await convertToUSD(country.avg_price, country.currency))
+    })));
 
-    if (countryUSDPrices.length > 0) {
-      countryUSDPrices.sort((a, b) => a.averagePrice - b.averagePrice);
-      stats.lowestPriceCountry = countryUSDPrices[0];
-      stats.highestPriceCountry = countryUSDPrices[countryUSDPrices.length - 1];
+    if (countryPriceData.length > 0) {
+      countryPriceData.sort((a, b) => a.averagePrice - b.averagePrice);
+      stats.lowestPriceCountry = countryPriceData[0];
+      stats.highestPriceCountry = countryPriceData[countryPriceData.length - 1];
     }
 
     // 6. Get most purchased medicine
@@ -365,6 +351,51 @@ router.get("/global-trends", async (req, res) => {
   } catch (error) {
     console.error("Error fetching global trends:", error);
     res.status(500).json({ error: "Failed to fetch global trends" });
+  }
+});
+
+// Update routes to use direct conversion
+router.get('/price-stats', async (req, res) => {
+  try {
+    const prices = await db.collection('prices').find().toArray();
+    
+    // Convert prices individually
+    const convertedPrices = await Promise.all(prices.map(async (price) => {
+      const usdPrice = await convertToUSD(price.amount, price.currency);
+      return {
+        ...price,
+        usdPrice
+      };
+    }));
+    
+    // Calculate statistics
+    const stats = calculatePriceStats(convertedPrices);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error calculating price stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/country-stats', async (req, res) => {
+  try {
+    const prices = await db.collection('prices').find().toArray();
+    
+    // Convert prices individually
+    const convertedPrices = await Promise.all(prices.map(async (price) => {
+      const usdPrice = await convertToUSD(price.amount, price.currency);
+      return {
+        ...price,
+        usdPrice
+      };
+    }));
+    
+    // Calculate country-specific stats
+    const countryStats = calculateCountryStats(convertedPrices);
+    res.json(countryStats);
+  } catch (error) {
+    console.error('Error calculating country stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
