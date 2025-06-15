@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
@@ -17,5 +16,8 @@ router.post('/reset-password', authController.resetPassword);
 
 // Verify email
 router.post('/verify-email', authController.verifyEmail);
+
+// Google OAuth
+router.post('/google', authController.googleAuth);
 
 module.exports = router;

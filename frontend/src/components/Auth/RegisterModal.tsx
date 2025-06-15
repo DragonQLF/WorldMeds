@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +9,7 @@ import { Eye, EyeOff, Key, Mail, User } from "lucide-react";
 import { z } from "zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMapContext } from "@/contexts/MapContext";
+import { GoogleLogin } from '@react-oauth/google';
 
 interface RegisterModalProps {
   isOpen: boolean;
@@ -219,15 +219,46 @@ export default function RegisterModal({
             </Button>
           </form>
         </Form>
-        
+        {/* Divider */}
+        <div className="flex items-center my-6 w-full">
+          <div className="flex-grow border-t border-gray-700"></div>
+          <span className="mx-3 text-muted-foreground text-xs">or</span>
+          <div className="flex-grow border-t border-gray-700"></div>
+        </div>
+        {/* Google Sign-In Button */}
+        <div className="flex flex-col items-center w-full mb-2">
+          <GoogleLogin 
+            theme={darkMode ? "filled_black" : "outline"}
+            width={340}
+            text="continue_with"
+            shape="pill"
+            onSuccess={async (credentialResponse) => {
+              if (credentialResponse.credential) {
+                try {
+                  // Send credential to backend for verification
+                  const response = await fetch('/api/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: credentialResponse.credential }),
+                  });
+                  const data = await response.json();
+                  if (data.success) {
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    window.location.reload();
+                  }
+                } catch (error) {
+                  // Optionally handle error
+                }
+              }
+            }}
+            onError={() => {}}
+          />
+        </div>
         <div className="mt-4 text-center text-sm">
-          Already have an account?{" "}
-          <Button 
-            variant="link" 
-            className="p-0" 
-            onClick={onLoginClick}
-          >
-            Sign in
+          Already have an account?{' '}
+          <Button variant="link" className="p-0 text-primary" onClick={onLoginClick}>
+            Log in
           </Button>
         </div>
       </DialogContent>

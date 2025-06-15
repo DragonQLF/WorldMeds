@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMapContext } from "@/contexts/MapContext";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { GoogleLogin } from '@react-oauth/google';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -181,6 +181,45 @@ export default function LoginModal({
             </Button>
           </form>
         </Form>
+        
+        {/* Divider */}
+        <div className="flex items-center my-6 w-full">
+          <div className="flex-grow border-t border-gray-700"></div>
+          <span className="mx-3 text-muted-foreground text-xs">or</span>
+          <div className="flex-grow border-t border-gray-700"></div>
+        </div>
+        {/* Google Sign-In Button */}
+        <div className="flex flex-col items-center w-full mb-2">
+          <GoogleLogin 
+            theme={darkMode ? "filled_black" : "outline"}
+            width={340}
+            text="continue_with"
+            shape="pill"
+            onSuccess={async (credentialResponse) => {
+              if (credentialResponse.credential) {
+                try {
+                  // Send credential to backend for verification
+                  const response = await fetch('/api/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: credentialResponse.credential }),
+                  });
+                  const data = await response.json();
+                  if (data.success) {
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    window.location.reload();
+                  } else {
+                    setLoginError(data.message || 'Google login failed');
+                  }
+                } catch (error) {
+                  setLoginError('Google login failed');
+                }
+              }
+            }}
+            onError={() => setLoginError('Google login failed')}
+          />
+        </div>
         
         <div className="mt-4 text-center text-sm dark:text-gray-300">
           Don't have an account?{" "}
