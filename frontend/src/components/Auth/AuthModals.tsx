@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
@@ -6,6 +5,8 @@ import ForgotPasswordModal from './ForgotPasswordModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import MobileLoginPage from './MobileLoginPage';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuthModal } from '@/contexts/AuthModalContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type ModalType = 'login' | 'register' | 'forgotPassword' | 'resetPassword' | null;
 
@@ -15,8 +16,10 @@ interface AuthModalsProps {
   resetToken?: string;
 }
 
-export default function AuthModals({ modalType, onClose, resetToken }: AuthModalsProps) {
+const AuthModals: React.FC<AuthModalsProps> = ({ modalType, onClose, resetToken }) => {
   const isMobile = useIsMobile();
+  const { setModalType, isModalOpen, setIsModalOpen } = useAuthModal();
+  const { user } = useAuth();
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -91,3 +94,5 @@ export default function AuthModals({ modalType, onClose, resetToken }: AuthModal
     </>
   );
 }
+
+export default AuthModals;

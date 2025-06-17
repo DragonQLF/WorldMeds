@@ -40,8 +40,9 @@ interface TooltipData {
 }
 
 interface InteractiveMapProps {
-  onCountryClick: (country: any) => void;
+  onCountryClick?: (country: { id: string | number; name: string; averagePrice: number; totalMedicines: number }) => void;
   isSidebarExpanded: boolean;
+  authModalType: ModalType | null;
 }
 
 interface CurrencyRates {
@@ -50,7 +51,7 @@ interface CurrencyRates {
 
 const geoUrl = "/features.json";
 
-const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapProps) => {
+const InteractiveMap = ({ onCountryClick, isSidebarExpanded, authModalType }: InteractiveMapProps) => {
   const { 
     selectedMonth, 
     setSelectedMonth, 
@@ -114,7 +115,6 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       try {
         // Use the fetchCurrencyRates function from api.ts
         const rates = await fetchCurrencyRates();
-        console.log('Loaded currency rates:', rates);
         setCurrencyRates(rates);
       } catch (error) {
         console.error('Error loading currency rates:', error);
@@ -172,15 +172,12 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
         if (selectedDate) {
           const formattedDate = selectedDate.toISOString().split('T')[0];
           dateParam = `?date=${formattedDate}`;
-          console.log("Using date parameter:", dateParam);
         } else if (dateRange && dateRange.from) {
           const from = dateRange.from.toISOString().split('T')[0];
           const to = dateRange.to ? dateRange.to.toISOString().split('T')[0] : '';
           dateParam = `?start=${from}${to ? `&end=${to}` : ''}`;
-          console.log("Using date range parameter:", dateParam);
         } else if (selectedMonth && selectedMonth !== 'all') {
           dateParam = `?month=${selectedMonth}`;
-          console.log("Using month parameter:", dateParam);
           
           // Calculate previous month for comparison
           const currentDate = new Date(selectedMonth + "-01");
@@ -196,16 +193,12 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       let previousPrices: { [key: string]: number } = {};
 
       try {
-        console.log("Fetching global average with params:", dateParam);
         const globalRes = await api.get(`/global-average-medicine-price${dateParam}`);
         globalAverageValue = parseFloat(globalRes.data.global_average) || globalAverageValue;
         
         // Ensure global average is a valid number
         if (isNaN(globalAverageValue) || globalAverageValue <= 0) {
           globalAverageValue = 10; // Fallback to a reasonable default
-          console.warn("Invalid global average, using default:", 10);
-        } else {
-          console.log("Global average price:", globalAverageValue);
         }
       } catch (error) {
         console.warn("Could not fetch global average price, using default value", error);
@@ -224,7 +217,6 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       }
 
       try {
-        console.log("Fetching country data with params:", dateParam);
         const countriesRes = await api.get(`/countries-average-prices${dateParam}`);
         
         // Simple hash function to generate a consistent color based on country ID
@@ -315,15 +307,6 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
 
   // Fetch data when date filters change or useTimeFiltering changes
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Date parameters:', {
-        selectedMonth,
-        selectedDate,
-        dateRange,
-        useTimeFiltering,
-        monthParam: selectedMonth ? `?month=${selectedMonth}` : null
-      });
-    }
     fetchData();
   }, [selectedDate, dateRange, selectedMonth, useTimeFiltering]);
 
@@ -411,12 +394,10 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
     
     // Validate geo object
     if (!geo || !geo.properties || !geo.properties.name) {
-      console.log("Invalid geo object:", geo);
       return;
     }
     
     const countryName = geo.properties.name;
-    console.log("Country clicked:", countryName);
     
     // Check if we're just closing a tooltip
     const existingTooltipIndex = tooltips.findIndex(
@@ -436,7 +417,6 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
   
     // If we didn't find the country in our data, we can't proceed
     if (!country) {
-      console.log("Country not found in data:", countryName);
       toast({
         title: "No Data Available",
         description: `${countryName} has no medicine data available.`,
@@ -447,7 +427,6 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
   
     // Check if the country has data (averagePrice and totalMedicines)
     if (!country.averagePrice && !country.totalMedicines) {
-      console.log("Country has no data:", countryName);
       toast({
         title: "No Data Available",
         description: `${countryName} has no medicine data available.`,
@@ -456,8 +435,6 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       return;
     }
   
-    console.log("Found country data:", country);
-    
     // Create a proper country object to pass to the parent handler
     const countryObject = {
       id: country.countryId,
@@ -469,7 +446,6 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
     // On mobile or in graphs mode, always open the full details
     if (visualizationType === "graphs" || (isMobile && visualizationType !== "markers")) {
       onCountryClick?.(countryObject);
-      console.log("Setting detailCountryId:", country.countryId);
       setDetailCountryId(country.countryId);
     } else {
       // For tooltips view, handle tooltip display
@@ -677,7 +653,7 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       </ComposableMap>
 
       {/* Render all tooltips (both hover and pinned) */}
-      {tooltips.map((tooltip, index) => 
+      {!authModalType && tooltips.map((tooltip, index) => 
         tooltip.visible && (
           <CountryTooltip
             key={`${tooltip.country.countryId}-${index}`}
@@ -694,7 +670,7 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded }: InteractiveMapPro
       )}
 
       {/* Show the map legend */}
-      {showLegend && (
+      {!authModalType && showLegend && (
         <MapLegend 
           globalAverage={globalAverage}
           darkMode={darkMode}

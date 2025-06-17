@@ -55,7 +55,6 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authModalType, setAuthModalType] = useState<ModalType>(null);
 
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -86,38 +85,11 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
     }
   }, [user, profileForm]);
 
-  useEffect(() => {
-    const handleOpenAuthModal = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail && customEvent.detail.type) {
-        setAuthModalType(customEvent.detail.type);
-      }
-    };
-
-    window.addEventListener('open-auth-modal', handleOpenAuthModal);
-    
-    return () => {
-      window.removeEventListener('open-auth-modal', handleOpenAuthModal);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleUserDataRefreshed = (e: Event) => {
-      // Force a refresh of user data in the Auth context
-      if (refreshProfile) {
-        refreshProfile();
-      }
-    };
-    
-    window.addEventListener('user-data-refreshed', handleUserDataRefreshed);
-    
-    return () => {
-      window.removeEventListener('user-data-refreshed', handleUserDataRefreshed);
-    };
-  }, [refreshProfile]);
-
   const handleLoginClick = () => {
-    setAuthModalType('login');
+    const event = new CustomEvent('open-auth-modal', {
+      detail: { type: 'login' }
+    });
+    window.dispatchEvent(event);
   };
 
   // Get user initials for avatar
@@ -171,18 +143,6 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isExpanded }) => {
 
   return (
     <footer className="flex flex-col items-start gap-4 w-full">
-      {/* Auth Modals */}
-      {authModalType && (
-        <div id="auth-modals">
-          <div>
-            <AuthModals 
-              modalType={authModalType} 
-              onClose={() => setAuthModalType(null)} 
-            />
-          </div>
-        </div>
-      )}
-
       {isAuthenticated ? (
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>

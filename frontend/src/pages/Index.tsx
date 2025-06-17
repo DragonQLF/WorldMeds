@@ -16,6 +16,8 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SearchSelectionModal } from "@/components/search/SearchSelectionModal";
 import MedicineDetail from "@/components/map/MedicineDetail";
+import { ModalType } from "@/components/Auth/AuthModals";
+import AuthModals from "@/components/Auth/AuthModals";
 
 const Index = () => {
   const [selectedCountryId, setSelectedCountryId] = useState<string | null>(null);
@@ -27,6 +29,7 @@ const Index = () => {
   const [selectedMedicineId, setSelectedMedicineId] = useState<string | null>(null);
   const [showMedicineDetail, setShowMedicineDetail] = useState<boolean>(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [authModalType, setAuthModalType] = useState<ModalType>(null);
   
   // Handlers for sidebar hover
   const handleSidebarMouseEnter = () => {
@@ -101,12 +104,31 @@ const Index = () => {
     }
   };
 
+  useEffect(() => {
+    const handleOpenAuthModal = (customEvent: CustomEvent<{ type: 'login' | 'register' }>) => {
+      setAuthModalType(customEvent.detail.type);
+    };
+    window.addEventListener('open-auth-modal', handleOpenAuthModal);
+    return () => {
+      window.removeEventListener('open-auth-modal', handleOpenAuthModal);
+    };
+  }, []);
+
   return (
     <Layout 
       isExpanded={isSidebarExpanded}
       onMouseEnter={handleSidebarMouseEnter}
       onMouseLeave={handleSidebarMouseLeave}
     >
+      {/* Auth Modals - always mounted at top level */}
+      {authModalType && (
+        <div id="auth-modals">
+          <AuthModals 
+            modalType={authModalType} 
+            onClose={() => setAuthModalType(null)} 
+          />
+        </div>
+      )}
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background dark:bg-gray-950">
         {/* Search and actions buttons */}
         <div className={cn(
@@ -158,10 +180,13 @@ const Index = () => {
           </TooltipProvider>
         </div>
         
-        <InteractiveMap 
-          onCountryClick={handleCountrySelect} 
-          isSidebarExpanded={isSidebarExpanded}
-        />
+        <div className="flex-1 relative">
+          <InteractiveMap 
+            onCountryClick={handleCountrySelect} 
+            isSidebarExpanded={isSidebarExpanded}
+            authModalType={authModalType}
+          />
+        </div>
         
         {/* Country details modal - only show when in details view or explicitly opened */}
         {showCountryDetail && selectedCountryId && (
