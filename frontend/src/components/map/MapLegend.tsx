@@ -30,7 +30,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({
   }, [isMobile]);
 
   const leftPositionClass = isMobile 
-    ? "left-4"
+    ? (isSidebarExpanded ? "left-[300px]" : "left-4")
     : (isSidebarExpanded ? "left-[236px]" : "left-[109px]");
 
   const bottomPositionClass = isMobile && isDateSliderOpen
@@ -103,7 +103,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({
         bottomPositionClass,
         isMobile ? "w-auto max-w-[calc(100vw-32px)]" : "w-auto max-w-[180px] sm:max-w-xs md:w-64",
         darkMode ? "bg-gray-800/95 text-white" : "bg-white/95 text-gray-800",
-        "backdrop-blur-sm z-50"
+        "backdrop-blur-sm z-10"
       )}
     >
       <div className="text-sm font-medium mb-2 flex flex-col gap-2">

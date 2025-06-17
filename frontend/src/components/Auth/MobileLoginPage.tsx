@@ -62,7 +62,7 @@ export default function MobileLoginPage({
   const logoSrc = darkMode ? "/icone-dark.png" : "/icone.png";
 
   return (
-    <div className="min-h-screen bg-background dark:bg-gray-900 flex flex-col">
+    <div className="fixed inset-0 min-h-screen bg-background dark:bg-gray-900 flex flex-col z-[9999]">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b dark:border-gray-800">
         <Button 

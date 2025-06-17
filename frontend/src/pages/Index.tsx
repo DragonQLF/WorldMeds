@@ -30,6 +30,7 @@ const Index = () => {
   const [showMedicineDetail, setShowMedicineDetail] = useState<boolean>(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [authModalType, setAuthModalType] = useState<ModalType>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   // Handlers for sidebar hover
   const handleSidebarMouseEnter = () => {
@@ -43,6 +44,10 @@ const Index = () => {
       setIsSidebarExpanded(false);
     }
   };
+
+  // Handler for mobile sidebar open/close
+  const handleMobileSidebarOpen = () => setIsMobileSidebarOpen(true);
+  const handleMobileSidebarClose = () => setIsMobileSidebarOpen(false);
   
   // Reset the detail view when component mounts or when date filters change
   useEffect(() => {
@@ -119,6 +124,9 @@ const Index = () => {
       isExpanded={isSidebarExpanded}
       onMouseEnter={handleSidebarMouseEnter}
       onMouseLeave={handleSidebarMouseLeave}
+      onMobileSidebarOpen={handleMobileSidebarOpen}
+      onMobileSidebarClose={handleMobileSidebarClose}
+      isMobileSidebarOpen={isMobileSidebarOpen}
     >
       {/* Auth Modals - always mounted at top level */}
       {authModalType && (
@@ -183,7 +191,7 @@ const Index = () => {
         <div className="flex-1 relative">
           <InteractiveMap 
             onCountryClick={handleCountrySelect} 
-            isSidebarExpanded={isSidebarExpanded}
+            isSidebarExpanded={isMobile ? isMobileSidebarOpen : isSidebarExpanded}
             authModalType={authModalType}
           />
         </div>

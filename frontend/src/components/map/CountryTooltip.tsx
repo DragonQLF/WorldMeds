@@ -97,7 +97,7 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = memo(({
   }, [x, y, isPinned, mapRef, updatePosition]);
   
   // Calculate scale factor based on zoom level
-  const scale = Math.min(1.5, Math.max(0.8, 1.2 / zoom)); // Adjusted for inverse scaling: smaller when zooming in, larger when zooming out
+  const scale = Math.min(1, Math.max(0.5, 1 / zoom)); // Never smaller than 1 when zoomed in
 
   const positionStyle: React.CSSProperties = {
     position: 'absolute',

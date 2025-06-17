@@ -48,22 +48,22 @@ const App = () => (
   <GoogleOAuthProvider clientId="1006551602939-l857fi30aljqag85gccvn72p1vrokgvk.apps.googleusercontent.com">
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
+        attribute="class"
         defaultTheme="system"
-        storageKey="worldmeds-theme"
         enableSystem={true}
       >
-        <BrowserRouter>
-          <Suspense fallback={<Loading />}>
-            <FlagProvider>
-              <Routes>
-                {/* Public route for VerifyEmail - rendered outside AuthProvider */}
-                <Route path="/verify-email" element={<VerifyEmail />} />
+        <AuthProvider>
+          <BrowserRouter>
+            <Suspense fallback={<Loading />}>
+              <FlagProvider>
+                <Routes>
+                  {/* Public route for VerifyEmail - rendered outside AuthProvider */}
+                  <Route path="/verify-email" element={<VerifyEmail />} />
 
-                {/* All other routes wrapped within AuthProvider and other contexts */}
-                <Route
-                  path="/*" // Use a wildcard path to match all other routes
-                  element={
-                    <AuthProvider>
+                  {/* All other routes wrapped within AuthProvider and other contexts */}
+                  <Route
+                    path="/*" // Use a wildcard path to match all other routes
+                    element={
                       <MapProvider>
                         <TooltipProvider>
                           <Toaster />
@@ -87,23 +87,23 @@ const App = () => (
                             {/* Note: This nested fallback might need adjustment based on desired behavior for unmatched paths */} 
                             {/* within or outside the authenticated area. A single top-level fallback is usually sufficient. */}
                             {/* Keeping it simple for now based on the original structure's intent. */}
-                             {/* Removed the nested fallback to rely on the top-level one */}
+                            {/* Removed the nested fallback to rely on the top-level one */}
 
                           </Routes> {/* Close Nested Routes */}
                         </TooltipProvider>
                       </MapProvider>
-                    </AuthProvider>
-                  }
-                /> {/* Close wildcard Route */}
+                    }
+                  /> {/* Close wildcard Route */}
 
-                {/* Top-level fallback route for paths that don't match /verify-email or the wildcard route */}
-                {/* This catches paths that are not /verify-email and not handled within the AuthProvider's Routes */} 
-                 <Route path="*" element={<Navigate to="/" />} />
+                  {/* Top-level fallback route for paths that don't match /verify-email or the wildcard route */}
+                  {/* This catches paths that are not /verify-email and not handled within the AuthProvider's Routes */} 
+                  <Route path="*" element={<Navigate to="/" />} />
 
-              </Routes> {/* Close Top-level Routes */}
-            </FlagProvider>
-          </Suspense>
-        </BrowserRouter>
+                </Routes> {/* Close Top-level Routes */}
+              </FlagProvider>
+            </Suspense>
+          </BrowserRouter>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   </GoogleOAuthProvider>

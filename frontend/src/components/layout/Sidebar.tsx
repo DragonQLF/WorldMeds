@@ -11,15 +11,20 @@ interface SidebarProps {
   isExpanded: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onMobileSidebarOpen?: () => void;
+  onMobileSidebarClose?: () => void;
+  isMobileSidebarOpen?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   className, 
   isExpanded,
   onMouseEnter,
-  onMouseLeave
+  onMouseLeave,
+  onMobileSidebarOpen,
+  onMobileSidebarClose,
+  isMobileSidebarOpen
 }) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -27,44 +32,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
-    // Initial check
     checkIfMobile();
-    
-    // Add event listener
     window.addEventListener('resize', checkIfMobile);
-    
-    // Add animation init
-    const timer = setTimeout(() => {
-      setIsLoaded(true);
-    }, 100);
-    
-    // Cleanup
+    const timer = setTimeout(() => setIsLoaded(true), 100);
     return () => {
       window.removeEventListener('resize', checkIfMobile);
       clearTimeout(timer);
     };
   }, []);
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+  const handleMobileMenuOpen = () => {
+    if (onMobileSidebarOpen) onMobileSidebarOpen();
+  };
+  const handleMobileMenuClose = () => {
+    if (onMobileSidebarClose) onMobileSidebarClose();
   };
 
-  // For mobile: show hamburger menu button when closed, or MobileNav when open
   if (isMobile) {
     return (
       <>
-        {!isMobileMenuOpen && (
+        {!isMobileSidebarOpen && (
           <div className={`fixed top-4 left-4 z-50 transition-opacity duration-300 ease-in-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
             <button 
-              onClick={toggleMobileMenu} 
+              onClick={handleMobileMenuOpen} 
               className="p-2 rounded-md bg-background dark:bg-background text-foreground dark:text-foreground hover:bg-accent dark:hover:bg-accent transition-all duration-200 hover:shadow-md active:scale-95"
             >
               <Menu className="w-6 h-6" />
             </button>
           </div>
         )}
-        <MobileNav isOpen={isMobileMenuOpen} onClose={toggleMobileMenu} />
+        <MobileNav isOpen={!!isMobileSidebarOpen} onClose={handleMobileMenuClose} />
       </>
     );
   }

@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { CountryTooltip } from "./CountryTooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import DateSlider from "./DateSlider";
+import { ModalType } from "@/components/Auth/AuthModals";
 
 interface CountryData {
   countryId: string | number;
@@ -543,11 +544,11 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded, authModalType }: In
   }, []);
 
   const handleZoomIn = useCallback(() => {
-    setPosition((prev) => ({ ...prev, zoom: Math.min(prev.zoom * 1.5, 8) }));
+    setPosition((prev) => ({ ...prev, zoom: Math.min(prev.zoom * 1.5, 16) }));
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    setPosition((prev) => ({ ...prev, zoom: Math.max(prev.zoom / 1.5, 1) }));
+    setPosition((prev) => ({ ...prev, zoom: Math.max(prev.zoom / 1.5, 0.5) }));
   }, []);
 
   const handleMoveStart = useCallback(() => {
@@ -613,12 +614,14 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded, authModalType }: In
         <ZoomableGroup
           zoom={position.zoom}
           center={position.coordinates}
+          minZoom={0.5}
+          maxZoom={16}
           onMoveStart={handleMoveStart}
           onMoveEnd={handleMoveEnd}
           filterZoomEvent={(evt: any) => evt.type === 'wheel' ? !evt.ctrlKey : true}
           translateExtent={[
-            [-400, -200], // [xMin, yMin] - Adjust these values as needed
-            [2000, 1200],  // [xMax, yMax] - Adjust these values as needed
+            [-1000, -1000], // [xMin, yMin] - symmetric limits
+            [2600, 2600],  // [xMax, yMax] - symmetric limits
           ]}
         >
           <Geographies geography={geoUrl}>
@@ -670,7 +673,7 @@ const InteractiveMap = ({ onCountryClick, isSidebarExpanded, authModalType }: In
       )}
 
       {/* Show the map legend */}
-      {!authModalType && showLegend && (
+      {showLegend && (
         <MapLegend 
           globalAverage={globalAverage}
           darkMode={darkMode}

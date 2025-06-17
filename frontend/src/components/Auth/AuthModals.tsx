@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
 import ForgotPasswordModal from './ForgotPasswordModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import MobileLoginPage from './MobileLoginPage';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuthModal } from '@/contexts/AuthModalContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 export type ModalType = 'login' | 'register' | 'forgotPassword' | 'resetPassword' | null;
@@ -18,7 +17,6 @@ interface AuthModalsProps {
 
 const AuthModals: React.FC<AuthModalsProps> = ({ modalType, onClose, resetToken }) => {
   const isMobile = useIsMobile();
-  const { setModalType, isModalOpen, setIsModalOpen } = useAuthModal();
   const { user } = useAuth();
 
   const handleOpenChange = (open: boolean) => {
@@ -51,23 +49,14 @@ const AuthModals: React.FC<AuthModalsProps> = ({ modalType, onClose, resetToken 
     }, 150);
   };
 
-  // On mobile, show full-page login instead of modal
-  if (isMobile && modalType === 'login') {
-    return (
-      <div className="fixed inset-0 z-50 bg-background">
-        <MobileLoginPage
-          onBack={onClose}
-          onRegisterClick={handleOpenRegister}
-          onForgotPasswordClick={handleOpenForgotPassword}
-        />
-      </div>
-    );
+  if (isMobile) {
+    return <MobileLoginPage />;
   }
 
   return (
-    <>
+    <div>
       <LoginModal 
-        isOpen={modalType === 'login' && !isMobile} 
+        isOpen={modalType === 'login'} 
         onOpenChange={handleOpenChange}
         onRegisterClick={handleOpenRegister}
         onForgotPasswordClick={handleOpenForgotPassword}
@@ -91,7 +80,7 @@ const AuthModals: React.FC<AuthModalsProps> = ({ modalType, onClose, resetToken 
         onLoginClick={handleOpenLogin}
         token={resetToken}
       />
-    </>
+    </div>
   );
 }
 

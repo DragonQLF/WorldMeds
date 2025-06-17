@@ -79,7 +79,8 @@ export default function LoginModal({
       <DialogContent className={cn(
         "sm:max-w-[425px] w-[95vw] max-w-[425px]",
         "bg-background dark:bg-gray-900 text-foreground dark:text-gray-100 border dark:border-gray-800",
-        "max-h-[90vh] overflow-y-auto"
+        "max-h-[90vh] overflow-y-auto",
+        "z-[9999]"
       )}>
         <DialogHeader className="text-center">
           <div className="flex justify-center mb-2">
