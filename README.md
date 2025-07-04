@@ -72,4 +72,4 @@ This will launch:
 
 ## Contributors
 
-This project is maintained by WorldMeds.
+This project is being maintained by WorldMeds.
